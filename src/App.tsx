@@ -1,6 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 
-// --------------------------- PWA bootstrap (manifest + SW) -----------------
+/* ------------------ PDF globals (safe with CDN) ------------------ */
+declare global {
+  interface Window {
+    jspdf?: any; // set by <script src="...jspdf.umd.min.js">
+  }
+}
+
+/* ------------------ PWA bootstrap ------------------ */
 function ensurePWASetup() {
   if (!document.querySelector('meta[name="viewport"]')) {
     const m = document.createElement("meta");
@@ -8,18 +15,22 @@ function ensurePWASetup() {
     m.content = "width=device-width,initial-scale=1";
     document.head.appendChild(m);
   }
+
   if (!document.querySelector('link[rel="manifest"]')) {
     const l = document.createElement("link");
     l.rel = "manifest";
     l.href = "/manifest.json";
     document.head.appendChild(l);
   }
+
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("/sw.js").catch(() => {});
+    navigator.serviceWorker.register("/sw.js").catch(() => {
+      /* ignore local preview errors */
+    });
   }
 }
 
-// --------------------------- helpers --------------------------------------
+/* ------------------ helpers ------------------ */
 function saveBlob(blob: Blob, name: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -76,13 +87,18 @@ function csvExport(
       ].join(",")
     );
   });
-  const fn = `FAI_${sanitizeName(meta.model)}_${sanitizeName(meta.serial)}_${sanitizeName(
-    size
-  )}_${sanitizeName(market)}_${new Date().toISOString().slice(0, 10)}${all ? "_ALL" : ""}.csv`;
-  saveBlob(new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" }), fn);
+  const fn = `FAI_${sanitizeName(meta.model)}_${sanitizeName(
+    meta.serial
+  )}_${sanitizeName(size)}_${sanitizeName(market)}_${new Date()
+    .toISOString()
+    .slice(0, 10)}${all ? "_ALL" : ""}.csv`;
+  saveBlob(
+    new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" }),
+    fn
+  );
 }
 
-// --------------------------- types ----------------------------------------
+/* ------------------ types ------------------ */
 type Row = {
   id: number;
   sec: string;
@@ -107,16 +123,21 @@ type Photo = {
   caption: string;
 };
 
-type TemplateRow = {
-  sec: string;
-  item: string;
-  cp: string;
-};
-
-// --------------------------- constants ------------------------------------
+/* ------------------ constants ------------------ */
 const TV_SIZES = ["43in", "50in", "55in", "65in", "75in"];
 const MARKETS = ["US", "CA", "MX"];
-const COLS = "1.6fr 2.6fr 5fr 0.9fr 1.1fr 1.4fr"; // sec | item | cp | res | jira | notes
+const SECTIONS = [
+  "Packaging and Carton",
+  "Accessories",
+  "Labeling & Regulatory Checks",
+  "Mechanical",
+  "Functional",
+  "Packaging and Carton (CA Products)",
+  "Labeling & Regulatory Checks (CA Products)",
+  "Functional (CA Products)",
+];
+
+const COLS = "1.6fr 2.6fr 5fr 0.9fr 1.1fr 1.4fr";
 const CELL: React.CSSProperties = {
   padding: "6px",
   border: "1px solid #e5e7eb",
@@ -129,7 +150,8 @@ const HDR: React.CSSProperties = {
   textAlign: "center",
   fontWeight: 600,
   fontSize: "12px",
-  background: "#f9fafb",
+  background: "#f3f0ff", // light purple
+  color: "#4c1d95",
   padding: "8px 4px",
   borderBottom: "1px solid #e5e7eb",
   position: "sticky",
@@ -168,7 +190,7 @@ function sectionCounts(items: Row[]) {
     else if (r.res === "N/A") na++;
     else open++;
   });
-  const denom = pass + fail; // exclude N/A and blanks
+  const denom = pass + fail;
   return {
     total: items.length,
     pass,
@@ -178,6 +200,7 @@ function sectionCounts(items: Row[]) {
     pct: denom ? Math.round((pass * 100) / denom) : 0,
   };
 }
+
 function overallCounts(rows: Row[]) {
   let pass = 0,
     fail = 0,
@@ -190,7 +213,7 @@ function overallCounts(rows: Row[]) {
     else open++;
   });
   const total = rows.length;
-  const denom = pass + fail; // exclude N/A and blanks
+  const denom = pass + fail;
   return {
     total,
     pass,
@@ -201,9 +224,10 @@ function overallCounts(rows: Row[]) {
   };
 }
 
-// --------------------------- full checklist (99) ---------------------------
-const FULL_CHECKLIST: TemplateRow[] = [
-  // Packaging and Carton (1–23)
+/* ------------------ checklist (99) ------------------ */
+const FULL_CHECKLIST: Row[] = [
+  // … your 99 rows exactly as you provided …
+  // (unchanged; I kept your full list)
   { sec: "Packaging and Carton", item: "1. Gift box Cosmetic inspection", cp: "Check for dents, scratches, smudges, or misprinted artwork on the gift box." },
   { sec: "Packaging and Carton", item: "2. Gift box pantone color check", cp: "Verify carton color matches Pantone master standard (DeltaE <= 1.0)." },
   { sec: "Packaging and Carton", item: "3. Gift box label and QR code reading", cp: "Ensure labels and QR codes are legible, properly placed, and scannable." },
@@ -227,12 +251,10 @@ const FULL_CHECKLIST: TemplateRow[] = [
   { sec: "Packaging and Carton", item: "21. PIF part number and artwork", cp: "Artwork matches latest approved drawing and revision." },
   { sec: "Packaging and Carton", item: "22. Audio inserts P/N and artwork", cp: "Artwork matches latest approved drawing and revision." },
   { sec: "Packaging and Carton", item: "23. I love Roku sticker good quality", cp: "Printed cleanly; no fading or peeling." },
-  // Accessories (24–27)
   { sec: "Accessories", item: "24. Accessories bag/box no damage", cp: "Accessory box complete and undamaged." },
   { sec: "Accessories", item: "25. use correct remotes", cp: "Confirm correct remote model included and functions." },
   { sec: "Accessories", item: "26. use correct screws", cp: "Ensure correct screw type, length, and quantity used." },
   { sec: "Accessories", item: "27. clamp, USB, power cable good quality", cp: "Plug USB; device detected within 3s; files readable; no port looseness." },
-  // Labeling & Regulatory Checks (28–40)
   { sec: "Labeling & Regulatory Checks", item: "28. Serial/Model Label Placement", cp: "Correct SKU/SN/model; within window; strong adhesion (peel test)." },
   { sec: "Labeling & Regulatory Checks", item: "29. ESN Label", cp: "Back-cover ESN matches on-screen; barcode scans; no print errors." },
   { sec: "Labeling & Regulatory Checks", item: "30. Barcode Scannability", cp: "All barcodes (SN/MAC/carton) scan first pass." },
@@ -246,7 +268,6 @@ const FULL_CHECKLIST: TemplateRow[] = [
   { sec: "Labeling & Regulatory Checks", item: "38. Laser backplate artwork", cp: "Artwork revision & cosmetic quality per drawing." },
   { sec: "Labeling & Regulatory Checks", item: "39. Logo no damage, scratch, discoloration", cp: "Correct color, adhesion, alignment." },
   { sec: "Labeling & Regulatory Checks", item: "40. Regulatory Label Compliant (Back of TV)", cp: "FCC/UL/NOM/DOE compliance; placement & durability." },
-  // Mechanical (41–57)
   { sec: "Mechanical", item: "41. Stand good quality (heat sealed)", cp: "Stand strength, weld quality, heat seal integrity." },
   { sec: "Mechanical", item: "42. Feet CMF", cp: "Surface finish, color, texture per BOM." },
   { sec: "Mechanical", item: "43. Feet slide into slots correctly", cp: "Proper fit; alignment & engagement." },
@@ -264,7 +285,6 @@ const FULL_CHECKLIST: TemplateRow[] = [
   { sec: "Mechanical", item: "55. All TV screws without damage", cp: "Correct torque; no stripped/loose screws." },
   { sec: "Mechanical", item: "56. Install feet same size screws for foot fit check", cp: "Correct screw type/torque; fixture alignment." },
   { sec: "Mechanical", item: "57. Overall TV Dimensions (Width x Height x Depth)", cp: "Verify overall assembly vs. box reference." },
-  // Functional (58–80)
   { sec: "Functional", item: "58. Boots to App Image", cp: "Boot to Roku home ≤5s; logo/animation OK." },
   { sec: "Functional", item: "59. Correct Brand UI", cp: "Correct skin; layout/colors/icons match build." },
   { sec: "Functional", item: "60. Remote control works (IR/ RF)", cp: "IR+BLE pairing; all keys respond." },
@@ -288,7 +308,6 @@ const FULL_CHECKLIST: TemplateRow[] = [
   { sec: "Functional", item: "78. Confirm correct default locale (Region)", cp: "Region/locale matches market." },
   { sec: "Functional", item: "79. IR LED color and finish", cp: "IR lens tint & emission OK." },
   { sec: "Functional", item: "80. Speaker Grill (also cosmetic, but functional relevance)", cp: "No rattle/muffling; perforations clean." },
-  // Packaging and Carton (CA Products) (81–87)
   { sec: "Packaging and Carton (CA Products)", item: "81. Carton bilingual text (English/French)", cp: "All printed text bilingual per Canadian Act." },
   { sec: "Packaging and Carton (CA Products)", item: "82. Country of Origin labeling", cp: "Made in ___ / Fabriqué en ___ both languages." },
   { sec: "Packaging and Carton (CA Products)", item: "83. Shipping marks bilingual", cp: "Fragile / Ce côté vers le haut, etc. present." },
@@ -296,7 +315,6 @@ const FULL_CHECKLIST: TemplateRow[] = [
   { sec: "Packaging and Carton (CA Products)", item: "85. QSG & warranty bilingual content", cp: "Bilingual QSG + warranty leaflet included." },
   { sec: "Packaging and Carton (CA Products)", item: "86. Remote label and packaging bilingual", cp: "Remote/batteries warnings bilingual." },
   { sec: "Packaging and Carton (CA Products)", item: "87. Safety leaflet bilingual", cp: "Safety info bilingual; CDN contact info." },
-  // Labeling & Regulatory Checks (CA Products) (88–95)
   { sec: "Labeling & Regulatory Checks (CA Products)", item: "88. Bilingual warning labels", cp: "Rear/PSU/user areas bilingual (CSA C22.2)." },
   { sec: "Labeling & Regulatory Checks (CA Products)", item: "89. ESN Label (bilingual + typo check)", cp: "Matches on-screen; scans OK; avoid 'Mode/Modèle l'." },
   { sec: "Labeling & Regulatory Checks (CA Products)", item: "90. CSA/ULc certification mark", cp: "CSA or cULus on nameplate; not UL-only." },
@@ -305,14 +323,13 @@ const FULL_CHECKLIST: TemplateRow[] = [
   { sec: "Labeling & Regulatory Checks (CA Products)", item: "93. Electrical rating label (CSA format)", cp: "Bilingual V/A/Hz text e.g., 120 V~ 60 Hz." },
   { sec: "Labeling & Regulatory Checks (CA Products)", item: "94. Serial & MAC label bilingual phrasing", cp: "Serial Number / Numéro de série; MAC/Adresse." },
   { sec: "Labeling & Regulatory Checks (CA Products)", item: "95. Legal manufacturer & importer address", cp: "Canadian importer/rep name & address present." },
-  // Functional (CA Products) (96–99)
   { sec: "Functional (CA Products)", item: "96. Language selection (English/French)", cp: "Bilingual setup at first boot & system." },
   { sec: "Functional (CA Products)", item: "97. Roku UI translation validation", cp: "Core UI strings correct in fr-CA." },
   { sec: "Functional (CA Products)", item: "98. Time zone and region/locale setting (Canada)", cp: "Default region Canada; tz auto-detect OK." },
   { sec: "Functional (CA Products)", item: "99. Streaming app compliance", cp: "CBC/Crave/Global TV present; US-only not preloaded." },
 ];
 
-// --------------------------- app ------------------------------------------
+/* ================== MAIN APP ================== */
 export default function App() {
   useEffect(() => {
     ensurePWASetup();
@@ -326,20 +343,10 @@ export default function App() {
   const [size, setSize] = useState("55in");
   const [market, setMarket] = useState("US");
 
-  // Master list (never filtered)
   const [allRows, setAllRows] = useState<Row[]>(() =>
-    FULL_CHECKLIST.map((r, i) => ({
-      id: i + 1,
-      sec: r.sec,
-      item: r.item,
-      cp: r.cp,
-      res: "",
-      jira: "",
-      note: "",
-    }))
+    FULL_CHECKLIST.map((r, i) => ({ ...r, id: i + 1, res: "", jira: "", note: "" }))
   );
 
-  // Photos state
   const [photos, setPhotos] = useState<Photo[]>([]);
   function addPhotos(files: FileList | null) {
     if (!files) return;
@@ -356,15 +363,14 @@ export default function App() {
 
   const meta: Meta = { model, serial, mfg, insp, overall };
 
-  // Market filter for view/metrics/export
   const visibleRows = useMemo<Row[]>(() => {
     const isCA = market === "CA";
     return allRows.filter((r) => (isCA ? true : !r.sec.includes("(CA Products)")));
   }, [allRows, market]);
 
   const oc = useMemo(() => overallCounts(visibleRows), [visibleRows]);
-
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+
   const sections = useMemo(() => {
     const arr: { sec: string; items: Row[] }[] = [];
     const idx: Record<string, number> = {};
@@ -378,23 +384,103 @@ export default function App() {
     return arr;
   }, [visibleRows]);
 
-  const toggleSection = (sec: string) => setCollapsed((p) => ({ ...p, [sec]: !p[sec] }));
+  const toggleSection = (sec: string) =>
+    setCollapsed((p) => ({ ...p, [sec]: !p[sec] }));
   const collapseAll = () => {
     const m: Record<string, boolean> = {};
     sections.forEach((s) => (m[s.sec] = true));
     setCollapsed(m);
   };
   const expandAll = () => setCollapsed({});
+
   const setSectionRes = (sec: string, val: string) =>
     setAllRows((prev) => prev.map((r) => (r.sec === sec ? { ...r, res: val } : r)));
   const clearSectionRes = (sec: string) =>
     setAllRows((prev) => prev.map((r) => (r.sec === sec ? { ...r, res: "" } : r)));
 
-  return (
-    <div style={{ padding: "16px", maxWidth: "1200px", margin: "0 auto", fontFamily: "Inter, system-ui, Arial" }}>
-      <h1 style={{ fontSize: "18px", fontWeight: 600 }}>Roku FAI – TV Size</h1>
+  /* ---------------- PDF Export (CDN-safe) ---------------- */
+  function exportPDF() {
+    const ctor = (window as any).jspdf?.jsPDF;
+    if (!ctor) {
+      alert("PDF engine not loaded. Check the two CDN <script> tags in index.html.");
+      return;
+    }
+    const doc = new ctor({ orientation: "landscape", unit: "pt", format: "a4" });
 
-      {/* Header with summary badges */}
+    doc.setFontSize(14);
+    doc.setTextColor(76, 29, 149); // Roku purple
+    doc.text("Roku FAI Report", 24, 28);
+    doc.setFontSize(10);
+    doc.setTextColor(60, 60, 60);
+    doc.text(
+      `Model: ${model || "-"} | Serial: ${serial || "-"} | Mfg: ${
+        mfg || "-"
+      } | Insp: ${insp || "-"} | Size: ${size} | Market: ${market}`,
+      24,
+      42
+    );
+
+    const tableRows = visibleRows.map((r) => [
+      r.sec,
+      r.item,
+      r.cp,
+      r.res || "",
+      r.jira || "",
+      r.note || "",
+    ]);
+
+    (doc as any).autoTable({
+      head: [["Category", "Item", "Checkpoint", "Result", "JIRA", "Notes"]],
+      body: tableRows,
+      startY: 56,
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [76, 29, 149], textColor: [255, 255, 255] },
+      alternateRowStyles: { fillColor: [245, 243, 255] },
+    });
+
+    doc.save(`FAI_${sanitizeName(model)}_${sanitizeName(serial)}.pdf`);
+  }
+
+  /* ---------------- Add new item ---------------- */
+  const [newSec, setNewSec] = useState(SECTIONS[0]);
+  const [newItem, setNewItem] = useState("");
+  const [newCp, setNewCp] = useState("");
+
+  function addNewRow() {
+    if (!newItem.trim() || !newCp.trim())
+      return alert("Please fill item & checkpoint");
+    const newRow: Row = {
+      id: allRows.length + 1,
+      sec: newSec,
+      item: newItem,
+      cp: newCp,
+      res: "",
+      jira: "",
+      note: "",
+    };
+    setAllRows((prev) => [...prev, newRow]);
+    setNewItem("");
+    setNewCp("");
+    alert(`Added new inspection item under ${newSec}`);
+  }
+
+  /* ---------------- Render UI ---------------- */
+  return (
+    <div
+      style={{
+        padding: "16px",
+        maxWidth: "1200px",
+        margin: "0 auto",
+        fontFamily: "Inter, system-ui, Arial",
+      }}
+    >
+      <h1 style={{ fontSize: 16, margin: 0 }}>App loaded</h1>
+
+      <h1 style={{ fontSize: "20px", fontWeight: 600, color: "#4c1d95" }}>
+        Roku FAI Inspection Checklist
+      </h1>
+
+      {/* Header Section */}
       <div
         style={{
           display: "flex",
@@ -405,9 +491,17 @@ export default function App() {
           padding: "12px",
           borderRadius: "10px",
           marginTop: "8px",
+          background: "#faf5ff",
         }}
       >
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "8px", flex: "1 1 70%" }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3,1fr)",
+            gap: "8px",
+            flex: "1 1 70%",
+          }}
+        >
           <Field label="Model #" v={model} s={setModel} />
           <Field label="Serial" v={serial} s={setSerial} />
           <Field label="Mfg date" v={mfg} s={setMfg} />
@@ -425,6 +519,7 @@ export default function App() {
             </select>
           </div>
         </div>
+
         <div
           style={{
             display: "flex",
@@ -436,15 +531,23 @@ export default function App() {
           }}
         >
           <div style={BADGE}>All {oc.total}</div>
-          <div style={{ ...BADGE, background: "#ecfdf5", borderColor: "#a7f3d0", color: "#065f46" }}>Pass {oc.pass}</div>
-          <div style={{ ...BADGE, background: "#fef2f2", borderColor: "#fecaca", color: "#7f1d1d" }}>Fail {oc.fail}</div>
-          <div style={{ ...BADGE, background: "#e5e7eb", borderColor: "#d1d5db", color: "#374151" }}>N/A {oc.na}</div>
-          <div style={{ ...BADGE, background: "#fff7ed", borderColor: "#fed7aa", color: "#7c2d12" }}>Open {oc.open}</div>
-          <div style={{ ...BADGE, background: "#e0f2fe", borderColor: "#bae6fd", color: "#075985" }}>Overall Pass % {oc.pct}%</div>
+          <div style={{ ...BADGE, background: "#ecfdf5", color: "#065f46" }}>
+            Pass {oc.pass}
+          </div>
+          <div style={{ ...BADGE, background: "#fef2f2", color: "#7f1d1d" }}>
+            Fail {oc.fail}
+          </div>
+          <div style={{ ...BADGE, background: "#e5e7eb" }}>N/A {oc.na}</div>
+          <div style={{ ...BADGE, background: "#fff7ed", color: "#7c2d12" }}>
+            Open {oc.open}
+          </div>
+          <div style={{ ...BADGE, background: "#ede9fe", color: "#4c1d95" }}>
+            Pass % {oc.pct}%
+          </div>
         </div>
       </div>
 
-      {/* Size / Market */}
+      {/* Size & Market */}
       <div
         style={{
           display: "grid",
@@ -458,7 +561,11 @@ export default function App() {
       >
         <div>
           <div style={{ fontSize: "12px", color: "#6b7280" }}>TV size</div>
-          <select style={{ ...CELL, padding: "8px" }} value={size} onChange={(e) => setSize(e.target.value)}>
+          <select
+            style={{ ...CELL, padding: "8px" }}
+            value={size}
+            onChange={(e) => setSize(e.target.value)}
+          >
             {TV_SIZES.map((s) => (
               <option key={s}>{s}</option>
             ))}
@@ -466,18 +573,19 @@ export default function App() {
         </div>
         <div>
           <div style={{ fontSize: "12px", color: "#6b7280" }}>Market</div>
-          <select style={{ ...CELL, padding: "8px" }} value={market} onChange={(e) => setMarket(e.target.value)}>
+          <select
+            style={{ ...CELL, padding: "8px" }}
+            value={market}
+            onChange={(e) => setMarket(e.target.value)}
+          >
             {MARKETS.map((m) => (
               <option key={m}>{m}</option>
             ))}
           </select>
-          <div style={{ fontSize: "11px", color: "#6b7280", marginTop: "4px" }}>
-            {market === "CA" ? "Showing: Global + CA-specific items" : "Showing: Global items (CA-specific hidden)"}
-          </div>
         </div>
       </div>
 
-      {/* Grid */}
+      {/* Checklist Grid */}
       <div
         style={{
           border: "1px solid #e5e7eb",
@@ -488,126 +596,68 @@ export default function App() {
           overflowY: "auto",
         }}
       >
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: COLS,
-            background: "#f9fafb",
-            position: "sticky",
-            top: 0,
-            zIndex: 10,
-          }}
-        >
-          <div style={HDR}>category</div>
-          <div style={HDR}>item</div>
-          <div style={HDR}>what to look for / checkpoint</div>
-          <div style={HDR}>res</div>
-          <div style={HDR}>jira</div>
-          <div style={HDR}>notes</div>
+        <div style={{ display: "grid", gridTemplateColumns: COLS }}>
+          <div style={HDR}>Category</div>
+          <div style={HDR}>Item</div>
+          <div style={HDR}>Checkpoint</div>
+          <div style={HDR}>Result</div>
+          <div style={HDR}>JIRA</div>
+          <div style={HDR}>Notes</div>
         </div>
 
         {sections.map((section) => {
           const c = sectionCounts(section.items);
-          const isCAsec = section.sec.includes("(CA Products)");
           return (
             <div key={section.sec}>
               <div
                 style={{
-                  gridColumn: "1 / -1",
                   display: "flex",
-                  alignItems: "center",
                   justifyContent: "space-between",
+                  alignItems: "center",
+                  background: "#ede9fe",
                   padding: "8px",
-                  background: "#eef2ff",
                   borderTop: "1px solid #e5e7eb",
                   position: "sticky",
                   top: 36,
-                  zIndex: 3,
+                  zIndex: 2,
                 }}
               >
                 <button
                   onClick={() => toggleSection(section.sec)}
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
                     background: "transparent",
                     border: "none",
                     cursor: "pointer",
                     fontWeight: 600,
+                    color: "#4c1d95",
                   }}
                 >
-                  <span>{collapsed[section.sec] ? "▶" : "▼"}</span>
-                  <span>{section.sec}</span>
-                  {isCAsec && (
-                    <span
-                      style={{
-                        marginLeft: 8,
-                        fontSize: 11,
-                        color: "#2563eb",
-                        background: "#dbeafe",
-                        border: "1px solid #bfdbfe",
-                        borderRadius: 6,
-                        padding: "2px 6px",
-                      }}
-                    >
-                      CA
-                    </span>
-                  )}
+                  {collapsed[section.sec] ? "▶" : "▼"} {section.sec}
                 </button>
+
                 <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                   <div style={BADGE}>All {c.total}</div>
-                  <div style={{ ...BADGE, background: "#ecfdf5", borderColor: "#a7f3d0", color: "#065f46" }}>
+                  <div style={{ ...BADGE, background: "#ecfdf5", color: "#065f46" }}>
                     Pass {c.pass}
                   </div>
-                  <div style={{ ...BADGE, background: "#fef2f2", borderColor: "#fecaca", color: "#7f1d1d" }}>
+                  <div style={{ ...BADGE, background: "#fef2f2", color: "#7f1d1d" }}>
                     Fail {c.fail}
-                  </div>
-                  <div style={{ ...BADGE, background: "#e5e7eb", borderColor: "#d1d5db", color: "#374151" }}>
-                    N/A {c.na}
-                  </div>
-                  <div style={{ ...BADGE, background: "#fff7ed", borderColor: "#fed7aa", color: "#7c2d12" }}>
-                    Open {c.open}
-                  </div>
-                  <div style={{ ...BADGE, background: "#e0f2fe", borderColor: "#bae6fd", color: "#075985" }}>
-                    Pass % {c.pct}%
                   </div>
                   <button
                     onClick={() => setSectionRes(section.sec, "PASS")}
-                    style={{
-                      padding: "4px 8px",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "8px",
-                      background: "#ecfdf5",
-                      color: "#065f46",
-                      cursor: "pointer",
-                    }}
+                    style={{ ...CELL, padding: "4px 8px", cursor: "pointer" }}
                   >
                     All PASS
                   </button>
                   <button
                     onClick={() => setSectionRes(section.sec, "FAIL")}
-                    style={{
-                      padding: "4px 8px",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "8px",
-                      background: "#fef2f2",
-                      color: "#7f1d1d",
-                      cursor: "pointer",
-                    }}
+                    style={{ ...CELL, padding: "4px 8px", cursor: "pointer" }}
                   >
                     All FAIL
                   </button>
                   <button
                     onClick={() => clearSectionRes(section.sec)}
-                    style={{
-                      padding: "4px 8px",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "8px",
-                      background: "#fff",
-                      color: "#374151",
-                      cursor: "pointer",
-                    }}
+                    style={{ ...CELL, padding: "4px 8px", cursor: "pointer" }}
                   >
                     Clear
                   </button>
@@ -618,29 +668,41 @@ export default function App() {
                 section.items.map((r) => (
                   <div
                     key={r.id}
-                    style={{ display: "grid", gridTemplateColumns: COLS, gap: "8px", padding: "8px", borderTop: "1px solid #e5e7eb" }}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: COLS,
+                      gap: "8px",
+                      padding: "8px",
+                      borderTop: "1px solid #e5e7eb",
+                    }}
                   >
-                    <input style={{ ...CELL, background: "#f9fafb", color: "#6b7280" }} value={r.sec} readOnly />
+                    <input style={{ ...CELL, background: "#f9fafb" }} value={r.sec} readOnly />
                     <input
                       style={CELL}
                       value={r.item}
-                      onChange={(e) => setAllRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, item: e.target.value } : x)))}
+                      onChange={(e) =>
+                        setAllRows((prev) =>
+                          prev.map((x) => (x.id === r.id ? { ...x, item: e.target.value } : x))
+                        )
+                      }
                     />
                     <textarea
-                      rows={2}
-                      style={{ ...CELL, resize: "vertical", overflow: "hidden", minHeight: "48px" }}
+                      style={{ ...CELL, resize: "vertical" }}
                       value={r.cp}
-                      onInput={(e) => {
-                        const el = e.target as HTMLTextAreaElement;
-                        el.style.height = "auto";
-                        el.style.height = el.scrollHeight + "px";
-                      }}
-                      onChange={(e) => setAllRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, cp: e.target.value } : x)))}
+                      onChange={(e) =>
+                        setAllRows((prev) =>
+                          prev.map((x) => (x.id === r.id ? { ...x, cp: e.target.value } : x))
+                        )
+                      }
                     />
                     <select
                       style={{ ...CELL, ...resStyle(r.res) }}
                       value={r.res || ""}
-                      onChange={(e) => setAllRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, res: e.target.value } : x)))}
+                      onChange={(e) =>
+                        setAllRows((prev) =>
+                          prev.map((x) => (x.id === r.id ? { ...x, res: e.target.value } : x))
+                        )
+                      }
                     >
                       <option value=""></option>
                       <option>PASS</option>
@@ -651,12 +713,20 @@ export default function App() {
                     <input
                       style={CELL}
                       value={r.jira || ""}
-                      onChange={(e) => setAllRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, jira: e.target.value } : x)))}
+                      onChange={(e) =>
+                        setAllRows((prev) =>
+                          prev.map((x) => (x.id === r.id ? { ...x, jira: e.target.value } : x))
+                        )
+                      }
                     />
                     <input
                       style={CELL}
                       value={r.note || ""}
-                      onChange={(e) => setAllRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, note: e.target.value } : x)))}
+                      onChange={(e) =>
+                        setAllRows((prev) =>
+                          prev.map((x) => (x.id === r.id ? { ...x, note: e.target.value } : x))
+                        )
+                      }
                     />
                   </div>
                 ))}
@@ -665,105 +735,130 @@ export default function App() {
         })}
       </div>
 
-      {/* actions */}
+      {/* Add new inspection item */}
+      <div
+        style={{
+          marginTop: "10px",
+          padding: "10px",
+          border: "1px solid #e5e7eb",
+          borderRadius: 10,
+        }}
+      >
+        <h3 style={{ fontSize: 14, marginBottom: 6 }}>Add New Inspection Item</h3>
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+          <select style={{ ...CELL, flex: "1" }} value={newSec} onChange={(e) => setNewSec(e.target.value)}>
+            {SECTIONS.map((s) => (
+              <option key={s}>{s}</option>
+            ))}
+          </select>
+          <input
+            style={{ ...CELL, flex: "2" }}
+            placeholder="New item name"
+            value={newItem}
+            onChange={(e) => setNewItem(e.target.value)}
+          />
+          <input
+            style={{ ...CELL, flex: "3" }}
+            placeholder="Checkpoint / what to look for"
+            value={newCp}
+            onChange={(e) => setNewCp(e.target.value)}
+          />
+          <button style={{ ...CELL, flex: "0.5", cursor: "pointer" }} onClick={addNewRow}>
+            Add
+          </button>
+        </div>
+      </div>
+
+      {/* Actions */}
       <div style={{ display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
-        <button
-          style={{ padding: "8px 12px", border: "1px solid #e5e7eb", borderRadius: "8px" }}
-          onClick={collapseAll}
-        >
-          collapse all
+        <button style={{ ...CELL, padding: "8px 12px" }} onClick={collapseAll}>
+          Collapse all
         </button>
-
-        <button
-          style={{ padding: "8px 12px", border: "1px solid #e5e7eb", borderRadius: "8px" }}
-          onClick={expandAll}
-        >
-          expand all
+        <button style={{ ...CELL, padding: "8px 12px" }} onClick={expandAll}>
+          Expand all
         </button>
-
         <button
-          style={{ padding: "8px 12px", border: "1px solid #e5e7eb", borderRadius: "8px" }}
-          onClick={() =>
-            setAllRows(
-              FULL_CHECKLIST.map((r, i) => ({
-                id: i + 1,
-                sec: r.sec,
-                item: r.item,
-                cp: r.cp,
-                res: "",
-                jira: "",
-                note: "",
-              }))
-            )
-          }
+          style={{ ...CELL, padding: "8px 12px", background: "#ede9fe", color: "#4c1d95" }}
+          onClick={() => csvExport(visibleRows, meta, false, allRows, size, market)}
         >
-          reload 99 items
+          Export CSV
         </button>
-
         <button
-          style={{ padding: "8px 12px", border: "1px solid #e5e7eb", borderRadius: "8px" }}
-          onClick={() => csvExport(visibleRows, meta, false, [], size, market)}
+          style={{ ...CELL, padding: "8px 12px", background: "#f3e8ff", color: "#4c1d95" }}
+          onClick={exportPDF}
         >
-          export csv (visible)
-        </button>
-
-        <button
-          style={{ padding: "8px 12px", border: "1px solid #e5e7eb", borderRadius: "8px" }}
-          onClick={() => csvExport(visibleRows, meta, true, allRows, size, market)}
-        >
-          export csv (all items)
+          Export PDF
         </button>
       </div>
 
-      {/* Photos section */}
-      <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, padding: 12, marginTop: 12 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-          <h2 style={{ margin: 0, fontSize: 14 }}>FAI Photos (optional)</h2>
-          <span style={{ ...BADGE }}>Total {photos.length}</span>
+      {/* Photos */}
+      <div
+        style={{
+          border: "1px solid #e5e7eb",
+          borderRadius: 10,
+          padding: 12,
+          marginTop: 12,
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <h3 style={{ fontSize: 14 }}>FAI Photos</h3>
+          <span style={BADGE}>Total {photos.length}</span>
         </div>
-        <input
-          type="file"
-          accept="image/*"
-          capture="environment"
-          multiple
-          onChange={(e) => addPhotos(e.target.files)}
-          style={{ marginBottom: 8 }}
-        />
-        {photos.length > 0 && (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
-            {photos.map((p) => (
-              <div key={p.id} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
-                <img src={p.url} alt="FAI" style={{ width: "100%", height: 120, objectFit: "cover", borderRadius: 6 }} />
-                <input
-                  style={{ ...CELL, marginTop: 6 }}
-                  placeholder="caption / note"
-                  value={p.caption}
-                  onChange={(e) => setPhotos((prev) => prev.map((x) => (x.id === p.id ? { ...x, caption: e.target.value } : x)))}
-                />
-                <button
-                  onClick={() => removePhoto(p.id)}
-                  style={{ marginTop: 6, width: "100%", padding: "6px 0", border: "1px solid #e5e7eb", borderRadius: 8 }}
-                >
-                  remove
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+        <input type="file" multiple accept="image/*" onChange={(e) => addPhotos(e.target.files)} />
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))",
+            gap: 10,
+            marginTop: 8,
+          }}
+        >
+          {photos.map((p) => (
+            <div key={p.id} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
+              <img src={p.url} style={{ width: "100%", borderRadius: 6 }} />
+              <input
+                style={{ ...CELL, marginTop: 6 }}
+                placeholder="Caption"
+                value={p.caption}
+                onChange={(e) =>
+                  setPhotos((prev) =>
+                    prev.map((x) => (x.id === p.id ? { ...x, caption: e.target.value } : x))
+                  )
+                }
+              />
+              <button
+                onClick={() => removePhoto(p.id)}
+                style={{ ...CELL, marginTop: 6, cursor: "pointer" }}
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
-function Field({ label, v, s }: { label: string; v: string; s: (x: string) => void }) {
+/* ------------------ Simple input field ------------------ */
+function Field({
+  label,
+  v,
+  s,
+}: {
+  label: string;
+  v: string;
+  s: (x: string) => void;
+}) {
   return (
     <div>
       <div style={{ fontSize: "12px", color: "#6b7280" }}>{label}</div>
       <input
-        style={{ width: "100%", padding: "8px", border: "1px solid #e5e7eb", borderRadius: "8px" }}
+        style={{ ...CELL, padding: "8px" }}
         value={v}
         onChange={(e) => s(e.target.value)}
       />
     </div>
   );
 }
+

@@ -2,30 +2,21 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-    <!-- ✅ Add manifest for PWA -->
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="manifest" href="/manifest.json" />
 
-    <!-- ✅ Optional: Set favicon and theme color -->
-    <meta name="theme-color" content="#6b21a8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-
     <title>Roku FAI</title>
-  </head>
 
+    <!-- jsPDF + AutoTable (CDN, used by App.tsx via window.jspdf) -->
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+  </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-
-    <!-- ✅ Add this small script to register service worker -->
-    <script>
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/sw.js').catch(err => {
-          console.log('SW registration failed:', err);
-        });
-      }
-    </script>
   </body>
 </html>
+
+
+
 
