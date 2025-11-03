@@ -157,9 +157,6 @@ const HDR: React.CSSProperties = {
   color: "#4c1d95",
   padding: "8px 4px",
   borderBottom: "1px solid #e5e7eb",
-  position: "sticky",
-  top: 0,
-  zIndex: 10,
 };
 const BADGE: React.CSSProperties = {
   display: "inline-flex",
@@ -586,24 +583,36 @@ export default function App() {
         </div>
       </div>
 
-      {/* Checklist Grid */}
+      {/* Checklist container (scrollable) */}
       <div
         style={{
           border: "1px solid #e5e7eb",
           borderRadius: "10px",
           marginTop: "8px",
-          overflowX: "auto",
           maxHeight: "70vh",
           overflowY: "auto",
+          overflowX: "auto",
+          position: "relative",
         }}
       >
-        <div style={{ display: "grid", gridTemplateColumns: COLS }}>
-          <div style={HDR}>Category</div>
-          <div style={HDR}>Item</div>
-          <div style={HDR}>Checkpoint</div>
-          <div style={HDR}>Result</div>
-          <div style={HDR}>JIRA</div>
-          <div style={HDR}>Notes</div>
+        {/* Sticky column header */}
+        <div
+          style={{
+            position: "sticky",
+            top: 0,
+            zIndex: 30,
+            background: "#f3f0ff",
+            borderBottom: "1px solid #e5e7eb",
+          }}
+        >
+          <div style={{ display: "grid", gridTemplateColumns: COLS }}>
+            <div style={HDR}>Category</div>
+            <div style={HDR}>Item</div>
+            <div style={HDR}>Checkpoint</div>
+            <div style={HDR}>Result</div>
+            <div style={HDR}>JIRA</div>
+            <div style={HDR}>Notes</div>
+          </div>
         </div>
 
         {sections.map((section) => {
@@ -619,7 +628,7 @@ export default function App() {
                   padding: "8px",
                   borderTop: "1px solid #e5e7eb",
                   position: "sticky",
-                  top: 36,
+                  top: 36, // sits just below the sticky column header
                   zIndex: 2,
                 }}
               >
