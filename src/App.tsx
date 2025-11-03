@@ -117,6 +117,9 @@ type Meta = {
   overall: string;
 };
 
+// rows used to seed the app (no id/result fields yet)
+type RowSeed = { sec: string; item: string; cp: string };
+
 type Photo = {
   id: number;
   url: string;
@@ -224,10 +227,8 @@ function overallCounts(rows: Row[]) {
   };
 }
 
-/* ------------------ checklist (99) ------------------ */
-const FULL_CHECKLIST: Row[] = [
-  // … your 99 rows exactly as you provided …
-  // (unchanged; I kept your full list)
+/* --------------------------- checklist (99) --------------------------- */
+const FULL_CHECKLIST: RowSeed[] = [
   { sec: "Packaging and Carton", item: "1. Gift box Cosmetic inspection", cp: "Check for dents, scratches, smudges, or misprinted artwork on the gift box." },
   { sec: "Packaging and Carton", item: "2. Gift box pantone color check", cp: "Verify carton color matches Pantone master standard (DeltaE <= 1.0)." },
   { sec: "Packaging and Carton", item: "3. Gift box label and QR code reading", cp: "Ensure labels and QR codes are legible, properly placed, and scannable." },
@@ -409,15 +410,15 @@ export default function App() {
 
     doc.setFontSize(14);
     doc.setTextColor(76, 29, 149); // Roku purple
-    doc.text("Roku FAI Report", 24, 28);
+    doc.text("Roku FAI Report", 14, 20);
+
     doc.setFontSize(10);
     doc.setTextColor(60, 60, 60);
     doc.text(
-      `Model: ${model || "-"} | Serial: ${serial || "-"} | Mfg: ${
-        mfg || "-"
-      } | Insp: ${insp || "-"} | Size: ${size} | Market: ${market}`,
-      24,
-      42
+      `Model: ${model || "-"} | Serial: ${serial || "-"} | Mfg: ${mfg || "-"} | ` +
+        `Insp: ${insp || "-"} | Size: ${size} | Market: ${market}`,
+      14,
+      34
     );
 
     const tableRows = visibleRows.map((r) => [
@@ -432,8 +433,8 @@ export default function App() {
     (doc as any).autoTable({
       head: [["Category", "Item", "Checkpoint", "Result", "JIRA", "Notes"]],
       body: tableRows,
-      startY: 56,
-      styles: { fontSize: 8, cellPadding: 2 },
+      startY: 42,
+      styles: { fontSize: 7 },
       headStyles: { fillColor: [76, 29, 149], textColor: [255, 255, 255] },
       alternateRowStyles: { fillColor: [245, 243, 255] },
     });
@@ -784,7 +785,7 @@ export default function App() {
           Export CSV
         </button>
         <button
-          style={{ ...CELL, padding: "8px 12px", background: "#f3e8ff", color: "#4c1d95" }}
+          style={{ ...CELL, padding: "8px 12px", background: "#f3e8ff", color: "#4c1d95", cursor: "pointer" }}
           onClick={exportPDF}
         >
           Export PDF
@@ -861,4 +862,5 @@ function Field({
     </div>
   );
 }
+
 
