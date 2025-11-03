@@ -1,31 +1,21 @@
 import React, { useEffect, useMemo, useState } from "react";
 
 // --------------------------- PWA bootstrap (manifest + SW) -----------------
-// This keeps the single-file demo self-contained. In your real project, also add:
-//  - public/manifest.json  (display: "standalone", start_url: ".", icons, name/short_name)
-//  - public/sw.js          (a minimal service worker that calls skipWaiting()/clients.claim())
-//  - index.html            (<link rel="manifest" href="/manifest.json"> and viewport meta)
-// We inject the tags here for convenience and register the service worker.
 function ensurePWASetup() {
-  // <meta name="viewport" content="width=device-width,initial-scale=1"/>
   if (!document.querySelector('meta[name="viewport"]')) {
     const m = document.createElement("meta");
     m.name = "viewport";
     m.content = "width=device-width,initial-scale=1";
     document.head.appendChild(m);
   }
-  // <link rel="manifest" href="/manifest.json">
   if (!document.querySelector('link[rel="manifest"]')) {
     const l = document.createElement("link");
     l.rel = "manifest";
-    l.href = "/manifest.json"; // place this file in public/
+    l.href = "/manifest.json";
     document.head.appendChild(l);
   }
-  // Register service worker at /sw.js if available
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker
-      .register("/sw.js")
-      .catch(() => {/* ignore during local preview if missing */});
+    navigator.serviceWorker.register("/sw.js").catch(() => {});
   }
 }
 
@@ -86,9 +76,9 @@ function csvExport(
       ].join(",")
     );
   });
-  const fn = `FAI_${sanitizeName(meta.model)}_${sanitizeName(meta.serial)}_${sanitizeName(size)}_${sanitizeName(market)}_${new Date()
-    .toISOString()
-    .slice(0, 10)}${all ? "_ALL" : ""}.csv`;
+  const fn = `FAI_${sanitizeName(meta.model)}_${sanitizeName(meta.serial)}_${sanitizeName(
+    size
+  )}_${sanitizeName(market)}_${new Date().toISOString().slice(0, 10)}${all ? "_ALL" : ""}.csv`;
   saveBlob(new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" }), fn);
 }
 
@@ -115,6 +105,12 @@ type Photo = {
   id: number;
   url: string;
   caption: string;
+};
+
+type TemplateRow = {
+  sec: string;
+  item: string;
+  cp: string;
 };
 
 // --------------------------- constants ------------------------------------
@@ -206,7 +202,7 @@ function overallCounts(rows: Row[]) {
 }
 
 // --------------------------- full checklist (99) ---------------------------
-const FULL_CHECKLIST: Row[] = [
+const FULL_CHECKLIST: TemplateRow[] = [
   // Packaging and Carton (1–23)
   { sec: "Packaging and Carton", item: "1. Gift box Cosmetic inspection", cp: "Check for dents, scratches, smudges, or misprinted artwork on the gift box." },
   { sec: "Packaging and Carton", item: "2. Gift box pantone color check", cp: "Verify carton color matches Pantone master standard (DeltaE <= 1.0)." },
@@ -238,7 +234,7 @@ const FULL_CHECKLIST: Row[] = [
   { sec: "Accessories", item: "27. clamp, USB, power cable good quality", cp: "Plug USB; device detected within 3s; files readable; no port looseness." },
   // Labeling & Regulatory Checks (28–40)
   { sec: "Labeling & Regulatory Checks", item: "28. Serial/Model Label Placement", cp: "Correct SKU/SN/model; within window; strong adhesion (peel test)." },
-  { sec: "Labeling & Regulatory Checks", item: "29. ESN Label", cp: "Back‑cover ESN matches on‑screen; barcode scans; no print errors." },
+  { sec: "Labeling & Regulatory Checks", item: "29. ESN Label", cp: "Back-cover ESN matches on-screen; barcode scans; no print errors." },
   { sec: "Labeling & Regulatory Checks", item: "30. Barcode Scannability", cp: "All barcodes (SN/MAC/carton) scan first pass." },
   { sec: "Labeling & Regulatory Checks", item: "31. Regulatory/EMI Labels", cp: "Correct regional marks (FCC/UL/NOM/DOE/ENERGY STAR, etc.)." },
   { sec: "Labeling & Regulatory Checks", item: "32. Energy Label (DOE/FTC/NOM-032)", cp: "Rev/design match art; placed correctly; not obstructed." },
@@ -254,7 +250,7 @@ const FULL_CHECKLIST: Row[] = [
   { sec: "Mechanical", item: "41. Stand good quality (heat sealed)", cp: "Stand strength, weld quality, heat seal integrity." },
   { sec: "Mechanical", item: "42. Feet CMF", cp: "Surface finish, color, texture per BOM." },
   { sec: "Mechanical", item: "43. Feet slide into slots correctly", cp: "Proper fit; alignment & engagement." },
-  { sec: "Mechanical", item: "44. Thumbscrews engage smoothly and tighten securely", cp: "Correct thread; no cross‑thread/strip." },
+  { sec: "Mechanical", item: "44. Thumbscrews engage smoothly and tighten securely", cp: "Correct thread; no cross-thread/strip." },
   { sec: "Mechanical", item: "45. Positioning Guide Installed correctly", cp: "Fit & placement; no interference." },
   { sec: "Mechanical", item: "46. Screen/Panel no quality issues", cp: "Flatness; secure mount; no cracks/pressure." },
   { sec: "Mechanical", item: "47. Open Cell tape correctly placed", cp: "Adhesion/positioning; no air/wrinkles." },
@@ -274,18 +270,18 @@ const FULL_CHECKLIST: Row[] = [
   { sec: "Functional", item: "60. Remote control works (IR/ RF)", cp: "IR+BLE pairing; all keys respond." },
   { sec: "Functional", item: "61. Follow OOBA steps to connect WIFI and test", cp: "2.4G/5G connect OK; update prompt if any." },
   { sec: "Functional", item: "62. check software version", cp: "Build number vs release plan/golden sample." },
-  { sec: "Functional", item: "63. Guided Setup Completes", cp: "End‑to‑end OK; no crash/reboot." },
+  { sec: "Functional", item: "63. Guided Setup Completes", cp: "End-to-end OK; no crash/reboot." },
   { sec: "Functional", item: "64. Factory Reset using Reset button", cp: "Hold 10s; boots to OOBE." },
   { sec: "Functional", item: "65. adjusting volume to check sound no quality issues", cp: "Sound clean; no artifacts; mapping OK." },
   { sec: "Functional", item: "66. power on/off no image, sound quality issues", cp: "Cycles smoothly; no flicker/relay click." },
   { sec: "Functional", item: "67. No PSU AC noise issue during power on/standby", cp: "No coil whine/buzz on power/standby." },
-  { sec: "Functional", item: "68. No light leakage at dark screen, no shiny spot, bad pixel", cp: "Dark‑room: no edge/back leaks; no bright spots/mura." },
-  { sec: "Functional", item: "69. No Light leakage thru back cover gaps", cp: "Dark‑room: no light through back‑cover gaps." },
+  { sec: "Functional", item: "68. No light leakage at dark screen, no shiny spot, bad pixel", cp: "Dark-room: no edge/back leaks; no bright spots/mura." },
+  { sec: "Functional", item: "69. No Light leakage thru back cover gaps", cp: "Dark-room: no light through back-cover gaps." },
   { sec: "Functional", item: "70. adjusting brightness, contrast no display quality issues", cp: "Adjustments apply w/o flicker/instability." },
   { sec: "Functional", item: "71. USB/HMDI/IO port functional", cp: "Detect device; pass signal; mech sound." },
   { sec: "Functional", item: "72. TV tunner workable", cp: "Tuner scans & plays OK." },
   { sec: "Functional", item: "73. ALS test auto brightness", cp: "Auto brightness reacts when covering sensor." },
-  { sec: "Functional", item: "74. Ensure Wifi MAC Address is 'Roku Inc'", cp: "Wi‑Fi MAC OUI=Roku Inc; unique; 2.4/5G ok." },
+  { sec: "Functional", item: "74. Ensure Wifi MAC Address is 'Roku Inc'", cp: "Wi-Fi MAC OUI=Roku Inc; unique; 2.4/5G ok." },
   { sec: "Functional", item: "75. Ensure Ethernet MAC Address is 'Roku Inc'", cp: "LAN link; OUI Roku; traffic stable." },
   { sec: "Functional", item: "76. Ensure Bluetooth MAC Address is 'Roku Inc'", cp: "BT MAC OUI Roku; unique." },
   { sec: "Functional", item: "77. Software update to latest Rev. (Customer Mode)", cp: "Updates & reboots to home w/o error." },
@@ -302,8 +298,8 @@ const FULL_CHECKLIST: Row[] = [
   { sec: "Packaging and Carton (CA Products)", item: "87. Safety leaflet bilingual", cp: "Safety info bilingual; CDN contact info." },
   // Labeling & Regulatory Checks (CA Products) (88–95)
   { sec: "Labeling & Regulatory Checks (CA Products)", item: "88. Bilingual warning labels", cp: "Rear/PSU/user areas bilingual (CSA C22.2)." },
-  { sec: "Labeling & Regulatory Checks (CA Products)", item: "89. ESN Label (bilingual + typo check)", cp: "Matches on‑screen; scans OK; avoid 'Mode/Modèle l'." },
-  { sec: "Labeling & Regulatory Checks (CA Products)", item: "90. CSA/ULc certification mark", cp: "CSA or cULus on nameplate; not UL‑only." },
+  { sec: "Labeling & Regulatory Checks (CA Products)", item: "89. ESN Label (bilingual + typo check)", cp: "Matches on-screen; scans OK; avoid 'Mode/Modèle l'." },
+  { sec: "Labeling & Regulatory Checks (CA Products)", item: "90. CSA/ULc certification mark", cp: "CSA or cULus on nameplate; not UL-only." },
   { sec: "Labeling & Regulatory Checks (CA Products)", item: "91. Industry Canada (ISED) ID labeling", cp: "ISED ID printed & legible; matches docs." },
   { sec: "Labeling & Regulatory Checks (CA Products)", item: "92. FCC/IC dual compliance label", cp: "Combined FCC + IC statement present." },
   { sec: "Labeling & Regulatory Checks (CA Products)", item: "93. Electrical rating label (CSA format)", cp: "Bilingual V/A/Hz text e.g., 120 V~ 60 Hz." },
@@ -311,14 +307,16 @@ const FULL_CHECKLIST: Row[] = [
   { sec: "Labeling & Regulatory Checks (CA Products)", item: "95. Legal manufacturer & importer address", cp: "Canadian importer/rep name & address present." },
   // Functional (CA Products) (96–99)
   { sec: "Functional (CA Products)", item: "96. Language selection (English/French)", cp: "Bilingual setup at first boot & system." },
-  { sec: "Functional (CA Products)", item: "97. Roku UI translation validation", cp: "Core UI strings correct in fr‑CA." },
-  { sec: "Functional (CA Products)", item: "98. Time zone and region/locale setting (Canada)", cp: "Default region Canada; tz auto‑detect OK." },
-  { sec: "Functional (CA Products)", item: "99. Streaming app compliance", cp: "CBC/Crave/Global TV present; US‑only not preloaded." },
+  { sec: "Functional (CA Products)", item: "97. Roku UI translation validation", cp: "Core UI strings correct in fr-CA." },
+  { sec: "Functional (CA Products)", item: "98. Time zone and region/locale setting (Canada)", cp: "Default region Canada; tz auto-detect OK." },
+  { sec: "Functional (CA Products)", item: "99. Streaming app compliance", cp: "CBC/Crave/Global TV present; US-only not preloaded." },
 ];
 
 // --------------------------- app ------------------------------------------
 export default function App() {
-  useEffect(() => { ensurePWASetup(); }, []);
+  useEffect(() => {
+    ensurePWASetup();
+  }, []);
 
   const [model, setModel] = useState("");
   const [serial, setSerial] = useState("");
@@ -330,7 +328,15 @@ export default function App() {
 
   // Master list (never filtered)
   const [allRows, setAllRows] = useState<Row[]>(() =>
-    FULL_CHECKLIST.map((r, i) => ({ id: i + 1, sec: r.sec, item: r.item, cp: r.cp, res: "", jira: "", note: "" }))
+    FULL_CHECKLIST.map((r, i) => ({
+      id: i + 1,
+      sec: r.sec,
+      item: r.item,
+      cp: r.cp,
+      res: "",
+      jira: "",
+      note: "",
+    }))
   );
 
   // Photos state
@@ -466,9 +472,7 @@ export default function App() {
             ))}
           </select>
           <div style={{ fontSize: "11px", color: "#6b7280", marginTop: "4px" }}>
-            {market === "CA"
-              ? "Showing: Global + CA-specific items"
-              : "Showing: Global items (CA-specific hidden)"}
+            {market === "CA" ? "Showing: Global + CA-specific items" : "Showing: Global items (CA-specific hidden)"}
           </div>
         </div>
       </div>
@@ -484,7 +488,16 @@ export default function App() {
           overflowY: "auto",
         }}
       >
-        <div style={{ display: "grid", gridTemplateColumns: COLS, background: "#f9fafb", position: "sticky", top: 0, zIndex: 10 }}>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: COLS,
+            background: "#f9fafb",
+            position: "sticky",
+            top: 0,
+            zIndex: 10,
+          }}
+        >
           <div style={HDR}>category</div>
           <div style={HDR}>item</div>
           <div style={HDR}>what to look for / checkpoint</div>
@@ -544,26 +557,57 @@ export default function App() {
                 </button>
                 <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                   <div style={BADGE}>All {c.total}</div>
-                  <div style={{ ...BADGE, background: "#ecfdf5", borderColor: "#a7f3d0", color: "#065f46" }}>Pass {c.pass}</div>
-                  <div style={{ ...BADGE, background: "#fef2f2", borderColor: "#fecaca", color: "#7f1d1d" }}>Fail {c.fail}</div>
-                  <div style={{ ...BADGE, background: "#e5e7eb", borderColor: "#d1d5db", color: "#374151" }}>N/A {c.na}</div>
-                  <div style={{ ...BADGE, background: "#fff7ed", borderColor: "#fed7aa", color: "#7c2d12" }}>Open {c.open}</div>
-                  <div style={{ ...BADGE, background: "#e0f2fe", borderColor: "#bae6fd", color: "#075985" }}>Pass % {c.pct}%</div>
+                  <div style={{ ...BADGE, background: "#ecfdf5", borderColor: "#a7f3d0", color: "#065f46" }}>
+                    Pass {c.pass}
+                  </div>
+                  <div style={{ ...BADGE, background: "#fef2f2", borderColor: "#fecaca", color: "#7f1d1d" }}>
+                    Fail {c.fail}
+                  </div>
+                  <div style={{ ...BADGE, background: "#e5e7eb", borderColor: "#d1d5db", color: "#374151" }}>
+                    N/A {c.na}
+                  </div>
+                  <div style={{ ...BADGE, background: "#fff7ed", borderColor: "#fed7aa", color: "#7c2d12" }}>
+                    Open {c.open}
+                  </div>
+                  <div style={{ ...BADGE, background: "#e0f2fe", borderColor: "#bae6fd", color: "#075985" }}>
+                    Pass % {c.pct}%
+                  </div>
                   <button
                     onClick={() => setSectionRes(section.sec, "PASS")}
-                    style={{ padding: "4px 8px", border: "1px solid #e5e7eb", borderRadius: "8px", background: "#ecfdf5", color: "#065f46", cursor: "pointer" }}
+                    style={{
+                      padding: "4px 8px",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "8px",
+                      background: "#ecfdf5",
+                      color: "#065f46",
+                      cursor: "pointer",
+                    }}
                   >
                     All PASS
                   </button>
                   <button
                     onClick={() => setSectionRes(section.sec, "FAIL")}
-                    style={{ padding: "4px 8px", border: "1px solid #e5e7eb", borderRadius: "8px", background: "#fef2f2", color: "#7f1d1d", cursor: "pointer" }}
+                    style={{
+                      padding: "4px 8px",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "8px",
+                      background: "#fef2f2",
+                      color: "#7f1d1d",
+                      cursor: "pointer",
+                    }}
                   >
                     All FAIL
                   </button>
                   <button
                     onClick={() => clearSectionRes(section.sec)}
-                    style={{ padding: "4px 8px", border: "1px solid #e5e7eb", borderRadius: "8px", background: "#fff", color: "#374151", cursor: "pointer" }}
+                    style={{
+                      padding: "4px 8px",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "8px",
+                      background: "#fff",
+                      color: "#374151",
+                      cursor: "pointer",
+                    }}
                   >
                     Clear
                   </button>
@@ -572,14 +616,15 @@ export default function App() {
 
               {!collapsed[section.sec] &&
                 section.items.map((r) => (
-                  <div key={r.id} style={{ display: "grid", gridTemplateColumns: COLS, gap: "8px", padding: "8px", borderTop: "1px solid #e5e7eb" }}>
+                  <div
+                    key={r.id}
+                    style={{ display: "grid", gridTemplateColumns: COLS, gap: "8px", padding: "8px", borderTop: "1px solid #e5e7eb" }}
+                  >
                     <input style={{ ...CELL, background: "#f9fafb", color: "#6b7280" }} value={r.sec} readOnly />
                     <input
                       style={CELL}
                       value={r.item}
-                      onChange={(e) =>
-                        setAllRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, item: e.target.value } : x)))
-                      }
+                      onChange={(e) => setAllRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, item: e.target.value } : x)))}
                     />
                     <textarea
                       rows={2}
@@ -590,16 +635,12 @@ export default function App() {
                         el.style.height = "auto";
                         el.style.height = el.scrollHeight + "px";
                       }}
-                      onChange={(e) =>
-                        setAllRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, cp: e.target.value } : x)))
-                      }
+                      onChange={(e) => setAllRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, cp: e.target.value } : x)))}
                     />
                     <select
                       style={{ ...CELL, ...resStyle(r.res) }}
                       value={r.res || ""}
-                      onChange={(e) =>
-                        setAllRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, res: e.target.value } : x)))
-                      }
+                      onChange={(e) => setAllRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, res: e.target.value } : x)))}
                     >
                       <option value=""></option>
                       <option>PASS</option>
@@ -610,16 +651,12 @@ export default function App() {
                     <input
                       style={CELL}
                       value={r.jira || ""}
-                      onChange={(e) =>
-                        setAllRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, jira: e.target.value } : x)))
-                      }
+                      onChange={(e) => setAllRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, jira: e.target.value } : x)))}
                     />
                     <input
                       style={CELL}
                       value={r.note || ""}
-                      onChange={(e) =>
-                        setAllRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, note: e.target.value } : x)))
-                      }
+                      onChange={(e) => setAllRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, note: e.target.value } : x)))}
                     />
                   </div>
                 ))}
@@ -630,28 +667,46 @@ export default function App() {
 
       {/* actions */}
       <div style={{ display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
-        <button style={{ padding: "8px 12px", border: "1px solid #e5e7eb", borderRadius: "8px" }} onClick={collapseAll}>
+        <button
+          style={{ padding: "8px 12px", border: "1px solid #e5e7eb", borderRadius: "8px" }}
+          onClick={collapseAll}
+        >
           collapse all
         </button>
-        <button style={{ padding: "8px 12px", border: "1px solid #e5e7eb", borderRadius: "8px" }} onClick={expandAll}>
+
+        <button
+          style={{ padding: "8px 12px", border: "1px solid #e5e7eb", borderRadius: "8px" }}
+          onClick={expandAll}
+        >
           expand all
         </button>
+
         <button
           style={{ padding: "8px 12px", border: "1px solid #e5e7eb", borderRadius: "8px" }}
           onClick={() =>
             setAllRows(
-              FULL_CHECKLIST.map((r, i) => ({ id: i + 1, sec: r.sec, item: r.item, cp: r.cp, res: "", jira: "", note: "" }))
+              FULL_CHECKLIST.map((r, i) => ({
+                id: i + 1,
+                sec: r.sec,
+                item: r.item,
+                cp: r.cp,
+                res: "",
+                jira: "",
+                note: "",
+              }))
             )
           }
         >
           reload 99 items
         </button>
+
         <button
           style={{ padding: "8px 12px", border: "1px solid #e5e7eb", borderRadius: "8px" }}
           onClick={() => csvExport(visibleRows, meta, false, [], size, market)}
         >
           export csv (visible)
         </button>
+
         <button
           style={{ padding: "8px 12px", border: "1px solid #e5e7eb", borderRadius: "8px" }}
           onClick={() => csvExport(visibleRows, meta, true, allRows, size, market)}
@@ -683,9 +738,7 @@ export default function App() {
                   style={{ ...CELL, marginTop: 6 }}
                   placeholder="caption / note"
                   value={p.caption}
-                  onChange={(e) =>
-                    setPhotos((prev) => prev.map((x) => (x.id === p.id ? { ...x, caption: e.target.value } : x)))
-                  }
+                  onChange={(e) => setPhotos((prev) => prev.map((x) => (x.id === p.id ? { ...x, caption: e.target.value } : x)))}
                 />
                 <button
                   onClick={() => removePhoto(p.id)}
