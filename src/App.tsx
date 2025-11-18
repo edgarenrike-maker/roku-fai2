@@ -127,15 +127,7 @@ type Photo = {
 };
 
 /* ------------------ constants ------------------ */
-const TV_SIZES = [  "24in","32in",
-  "40in",
-  "43in",
-  "50in",
-  "55in",
-  "65in",
-  "70in",
-  "75in",
-  "85in"];
+const TV_SIZES = ["24in", "32in", "40in", "43in", "50in", "55in", "65in", "70in", "75in", "85in"];
 const MARKETS = ["US", "CA", "MX"];
 const SECTIONS = [
   "Packaging and Carton",
