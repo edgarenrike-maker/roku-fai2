@@ -31,71 +31,8 @@ function ensurePWASetup() {
 }
 
 /* ------------------ helpers ------------------ */
-function saveBlob(blob: Blob, name: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
 function sanitizeName(x: string) {
   return (x || "").replace(/[^a-z0-9_-]+/gi, "").slice(0, 40) || "NA";
-}
-
-function csvExport(
-  rows: Row[],
-  meta: Meta,
-  all: boolean = false,
-  allRows: Row[] = [],
-  size: string = "",
-  market: string = ""
-) {
-  const exportData = all ? allRows : rows;
-  const head = [
-    "model",
-    "serial",
-    "mfg",
-    "insp",
-    "overall",
-    "section",
-    "item",
-    "checkpoint",
-    "result",
-    "notes",
-    "jira",
-  ];
-  const lines: string[] = [head.join(",")];
-  const esc = (t: string) => (t || "").replaceAll('"', '""');
-  exportData.forEach((r) => {
-    lines.push(
-      [
-        meta.model,
-        meta.serial,
-        meta.mfg,
-        meta.insp,
-        meta.overall,
-        r.sec,
-        r.item,
-        '"' + esc(r.cp) + '"',
-        r.res || "",
-        '"' + esc(r.note || "") + '"',
-        r.jira || "",
-      ].join(",")
-    );
-  });
-  const fn = `FAI_${sanitizeName(meta.model)}_${sanitizeName(
-    meta.serial
-  )}_${sanitizeName(size)}_${sanitizeName(market)}_${new Date()
-    .toISOString()
-    .slice(0, 10)}${all ? "_ALL" : ""}.csv`;
-  saveBlob(
-    new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" }),
-    fn
-  );
 }
 
 /* ------------------ types ------------------ */
@@ -109,25 +46,28 @@ type Row = {
   note?: string;
 };
 
-type Meta = {
-  model: string;
-  serial: string;
-  mfg: string;
-  insp: string;
-  overall: string;
-};
-
 // rows used to seed the app (no id/result fields yet)
 type RowSeed = { sec: string; item: string; cp: string };
 
 type Photo = {
   id: number;
-  url: string;
+  dataUrl: string; // base64 Data URL for PDF export
   caption: string;
 };
 
 /* ------------------ constants ------------------ */
-const TV_SIZES = ["24in", "32in", "40in", "43in", "50in", "55in", "65in", "70in", "75in", "85in"];
+const TV_SIZES = [
+  "24in",
+  "32in",
+  "40in",
+  "43in",
+  "50in",
+  "55in",
+  "65in",
+  "70in",
+  "75in",
+  "85in",
+];
 const MARKETS = ["US", "CA", "MX"];
 const SECTIONS = [
   "Packaging and Carton",
@@ -342,28 +282,51 @@ export default function App() {
   const [market, setMarket] = useState("US");
 
   const [allRows, setAllRows] = useState<Row[]>(() =>
-    FULL_CHECKLIST.map((r, i) => ({ ...r, id: i + 1, res: "", jira: "", note: "" }))
+    FULL_CHECKLIST.map((r, i) => ({
+      ...r,
+      id: i + 1,
+      res: "",
+      jira: "",
+      note: "",
+    }))
   );
 
   const [photos, setPhotos] = useState<Photo[]>([]);
-  function addPhotos(files: FileList | null) {
+
+  // Read photos as base64 Data URLs (better for PDF export)
+  async function addPhotos(files: FileList | null) {
     if (!files) return;
-    const list: Photo[] = [];
-    Array.from(files).forEach((f) => {
-      const url = URL.createObjectURL(f);
-      list.push({ id: Date.now() + Math.random(), url, caption: "" });
-    });
-    setPhotos((p) => [...p, ...list]);
+
+    const fileArray = Array.from(files);
+    const newPhotos: Photo[] = await Promise.all(
+      fileArray.map(
+        (file) =>
+          new Promise<Photo>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              resolve({
+                id: Date.now() + Math.random(),
+                dataUrl: reader.result as string,
+                caption: "",
+              });
+            };
+            reader.readAsDataURL(file);
+          })
+      )
+    );
+
+    setPhotos((prev) => [...prev, ...newPhotos]);
   }
+
   function removePhoto(id: number) {
     setPhotos((p) => p.filter((x) => x.id !== id));
   }
 
-  const meta: Meta = { model, serial, mfg, insp, overall };
-
   const visibleRows = useMemo<Row[]>(() => {
     const isCA = market === "CA";
-    return allRows.filter((r) => (isCA ? true : !r.sec.includes("(CA Products)")));
+    return allRows.filter((r) =>
+      isCA ? true : !r.sec.includes("(CA Products)")
+    );
   }, [allRows, market]);
 
   const oc = useMemo(() => overallCounts(visibleRows), [visibleRows]);
@@ -392,19 +355,31 @@ export default function App() {
   const expandAll = () => setCollapsed({});
 
   const setSectionRes = (sec: string, val: string) =>
-    setAllRows((prev) => prev.map((r) => (r.sec === sec ? { ...r, res: val } : r)));
+    setAllRows((prev) =>
+      prev.map((r) => (r.sec === sec ? { ...r, res: val } : r))
+    );
   const clearSectionRes = (sec: string) =>
-    setAllRows((prev) => prev.map((r) => (r.sec === sec ? { ...r, res: "" } : r)));
+    setAllRows((prev) =>
+      prev.map((r) => (r.sec === sec ? { ...r, res: "" } : r))
+    );
 
-  /* ---------------- PDF Export (CDN-safe) ---------------- */
+  /* ---------------- PDF Export (table + photos) ---------------- */
   function exportPDF() {
     const ctor = (window as any).jspdf?.jsPDF;
     if (!ctor) {
-      alert("PDF engine not loaded. Check the two CDN <script> tags in index.html.");
+      alert(
+        "PDF engine not loaded. Check the two CDN <script> tags in index.html."
+      );
       return;
     }
-    const doc = new ctor({ orientation: "landscape", unit: "pt", format: "a4" });
 
+    const doc = new ctor({
+      orientation: "landscape",
+      unit: "pt",
+      format: "a4",
+    });
+
+    // Header
     doc.setFontSize(14);
     doc.setTextColor(76, 29, 149); // Roku purple
     doc.text("Roku FAI Report", 14, 20);
@@ -412,12 +387,14 @@ export default function App() {
     doc.setFontSize(10);
     doc.setTextColor(60, 60, 60);
     doc.text(
-      `Model: ${model || "-"} | Serial: ${serial || "-"} | Mfg: ${mfg || "-"} | ` +
-        `Insp: ${insp || "-"} | Size: ${size} | Market: ${market}`,
+      `Model: ${model || "-"} | Serial: ${serial || "-"} | Mfg: ${
+        mfg || "-"
+      } | ` + `Insp: ${insp || "-"} | Size: ${size} | Market: ${market}`,
       14,
       34
     );
 
+    // Table body
     const tableRows = visibleRows.map((r) => [
       r.sec,
       r.item,
@@ -435,6 +412,73 @@ export default function App() {
       headStyles: { fillColor: [76, 29, 149], textColor: [255, 255, 255] },
       alternateRowStyles: { fillColor: [245, 243, 255] },
     });
+
+    // Photos section
+    if (photos.length > 0) {
+      const lastY =
+        (doc as any).lastAutoTable?.finalY ??
+        60; // fallback in case autoTable missing
+
+      let x = 40;
+      let y = lastY + 30;
+
+    
+      const pageHeight = doc.internal.pageSize.getHeight();
+
+      const imgWidth = 160;
+      const imgHeight = 90;
+      const gapX = 20;
+      const gapY = 40;
+      const maxPerRow = 3;
+
+      doc.setFontSize(12);
+      doc.setTextColor(76, 29, 149);
+      doc.text("FAI Photos", 14, y - 15);
+
+      photos.forEach((p, idx) => {
+        // New row
+        if (idx % maxPerRow === 0 && idx !== 0) {
+          x = 40;
+          y += imgHeight + gapY;
+        }
+
+        // New page if not enough space
+        if (y + imgHeight + 40 > pageHeight) {
+          doc.addPage();
+          x = 40;
+          y = 60;
+          doc.setFontSize(12);
+          doc.setTextColor(76, 29, 149);
+          doc.text("FAI Photos (cont.)", 14, y - 15);
+        }
+
+        let format: "PNG" | "JPEG" = "JPEG";
+        if (p.dataUrl.startsWith("data:image/png")) {
+          format = "PNG";
+        }
+
+        try {
+          doc.addImage(p.dataUrl, format, x, y, imgWidth, imgHeight);
+        } catch {
+          // Fallback box if addImage fails
+          doc.setDrawColor(200);
+          doc.rect(x, y, imgWidth, imgHeight);
+          doc.setFontSize(8);
+          doc.setTextColor(150);
+          doc.text("Photo could not be embedded", x + 4, y + 12);
+        }
+
+        doc.setFontSize(8);
+        doc.setTextColor(60, 60, 60);
+        const caption =
+          p.caption && p.caption.trim()
+            ? p.caption.trim()
+            : `Photo ${idx + 1}`;
+        doc.text(caption, x, y + imgHeight + 10);
+
+        x += imgWidth + gapX;
+      });
+    }
 
     doc.save(`FAI_${sanitizeName(model)}_${sanitizeName(serial)}.pdf`);
   }
@@ -628,7 +672,7 @@ export default function App() {
                   padding: "8px",
                   borderTop: "1px solid #e5e7eb",
                   position: "sticky",
-                  top: 36, // sits just below the sticky column header
+                  top: 36, // just below header row
                   zIndex: 2,
                 }}
               >
@@ -645,12 +689,18 @@ export default function App() {
                   {collapsed[section.sec] ? "▶" : "▼"} {section.sec}
                 </button>
 
-                <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                <div
+                  style={{ display: "flex", gap: "6px", alignItems: "center" }}
+                >
                   <div style={BADGE}>All {c.total}</div>
-                  <div style={{ ...BADGE, background: "#ecfdf5", color: "#065f46" }}>
+                  <div
+                    style={{ ...BADGE, background: "#ecfdf5", color: "#065f46" }}
+                  >
                     Pass {c.pass}
                   </div>
-                  <div style={{ ...BADGE, background: "#fef2f2", color: "#7f1d1d" }}>
+                  <div
+                    style={{ ...BADGE, background: "#fef2f2", color: "#7f1d1d" }}
+                  >
                     Fail {c.fail}
                   </div>
                   <button
@@ -686,13 +736,19 @@ export default function App() {
                       borderTop: "1px solid #e5e7eb",
                     }}
                   >
-                    <input style={{ ...CELL, background: "#f9fafb" }} value={r.sec} readOnly />
+                    <input
+                      style={{ ...CELL, background: "#f9fafb" }}
+                      value={r.sec}
+                      readOnly
+                    />
                     <input
                       style={CELL}
                       value={r.item}
                       onChange={(e) =>
                         setAllRows((prev) =>
-                          prev.map((x) => (x.id === r.id ? { ...x, item: e.target.value } : x))
+                          prev.map((x) =>
+                            x.id === r.id ? { ...x, item: e.target.value } : x
+                          )
                         )
                       }
                     />
@@ -701,7 +757,9 @@ export default function App() {
                       value={r.cp}
                       onChange={(e) =>
                         setAllRows((prev) =>
-                          prev.map((x) => (x.id === r.id ? { ...x, cp: e.target.value } : x))
+                          prev.map((x) =>
+                            x.id === r.id ? { ...x, cp: e.target.value } : x
+                          )
                         )
                       }
                     />
@@ -710,7 +768,9 @@ export default function App() {
                       value={r.res || ""}
                       onChange={(e) =>
                         setAllRows((prev) =>
-                          prev.map((x) => (x.id === r.id ? { ...x, res: e.target.value } : x))
+                          prev.map((x) =>
+                            x.id === r.id ? { ...x, res: e.target.value } : x
+                          )
                         )
                       }
                     >
@@ -725,7 +785,9 @@ export default function App() {
                       value={r.jira || ""}
                       onChange={(e) =>
                         setAllRows((prev) =>
-                          prev.map((x) => (x.id === r.id ? { ...x, jira: e.target.value } : x))
+                          prev.map((x) =>
+                            x.id === r.id ? { ...x, jira: e.target.value } : x
+                          )
                         )
                       }
                     />
@@ -734,7 +796,9 @@ export default function App() {
                       value={r.note || ""}
                       onChange={(e) =>
                         setAllRows((prev) =>
-                          prev.map((x) => (x.id === r.id ? { ...x, note: e.target.value } : x))
+                          prev.map((x) =>
+                            x.id === r.id ? { ...x, note: e.target.value } : x
+                          )
                         )
                       }
                     />
@@ -754,9 +818,15 @@ export default function App() {
           borderRadius: 10,
         }}
       >
-        <h3 style={{ fontSize: 14, marginBottom: 6 }}>Add New Inspection Item</h3>
+        <h3 style={{ fontSize: 14, marginBottom: 6 }}>
+          Add New Inspection Item
+        </h3>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-          <select style={{ ...CELL, flex: "1" }} value={newSec} onChange={(e) => setNewSec(e.target.value)}>
+          <select
+            style={{ ...CELL, flex: "1" }}
+            value={newSec}
+            onChange={(e) => setNewSec(e.target.value)}
+          >
             {SECTIONS.map((s) => (
               <option key={s}>{s}</option>
             ))}
@@ -773,14 +843,24 @@ export default function App() {
             value={newCp}
             onChange={(e) => setNewCp(e.target.value)}
           />
-          <button style={{ ...CELL, flex: "0.5", cursor: "pointer" }} onClick={addNewRow}>
+          <button
+            style={{ ...CELL, flex: "0.5", cursor: "pointer" }}
+            onClick={addNewRow}
+          >
             Add
           </button>
         </div>
       </div>
 
       {/* Actions */}
-      <div style={{ display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
+      <div
+        style={{
+          display: "flex",
+          gap: "8px",
+          marginTop: "8px",
+          flexWrap: "wrap",
+        }}
+      >
         <button style={{ ...CELL, padding: "8px 12px" }} onClick={collapseAll}>
           Collapse all
         </button>
@@ -788,13 +868,13 @@ export default function App() {
           Expand all
         </button>
         <button
-          style={{ ...CELL, padding: "8px 12px", background: "#ede9fe", color: "#4c1d95" }}
-          onClick={() => csvExport(visibleRows, meta, false, allRows, size, market)}
-        >
-          Export CSV
-        </button>
-        <button
-          style={{ ...CELL, padding: "8px 12px", background: "#f3e8ff", color: "#4c1d95", cursor: "pointer" }}
+          style={{
+            ...CELL,
+            padding: "8px 12px",
+            background: "#f3e8ff",
+            color: "#4c1d95",
+            cursor: "pointer",
+          }}
           onClick={exportPDF}
         >
           Export PDF
@@ -814,7 +894,12 @@ export default function App() {
           <h3 style={{ fontSize: 14 }}>FAI Photos</h3>
           <span style={BADGE}>Total {photos.length}</span>
         </div>
-        <input type="file" multiple accept="image/*" onChange={(e) => addPhotos(e.target.files)} />
+        <input
+          type="file"
+          multiple
+          accept="image/*"
+          onChange={(e) => addPhotos(e.target.files)}
+        />
         <div
           style={{
             display: "grid",
@@ -824,15 +909,20 @@ export default function App() {
           }}
         >
           {photos.map((p) => (
-            <div key={p.id} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
-              <img src={p.url} style={{ width: "100%", borderRadius: 6 }} />
+            <div
+              key={p.id}
+              style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}
+            >
+              <img src={p.dataUrl} style={{ width: "100%", borderRadius: 6 }} />
               <input
                 style={{ ...CELL, marginTop: 6 }}
                 placeholder="Caption"
                 value={p.caption}
                 onChange={(e) =>
                   setPhotos((prev) =>
-                    prev.map((x) => (x.id === p.id ? { ...x, caption: e.target.value } : x))
+                    prev.map((x) =>
+                      x.id === p.id ? { ...x, caption: e.target.value } : x
+                    )
                   )
                 }
               />
@@ -871,5 +961,6 @@ function Field({
     </div>
   );
 }
+
 
 
