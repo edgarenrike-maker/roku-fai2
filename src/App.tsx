@@ -364,37 +364,46 @@ export default function App() {
     );
 
   /* ---------------- PDF Export (table + photos) ---------------- */
-  function exportPDF() {
+    function exportPDF() {
     const ctor = (window as any).jspdf?.jsPDF;
     if (!ctor) {
-      alert(
-        "PDF engine not loaded. Check the two CDN <script> tags in index.html."
-      );
+      alert("PDF engine not loaded. Check the two CDN <script> tags in index.html.");
       return;
     }
 
-    const doc = new ctor({
-      orientation: "landscape",
-      unit: "pt",
-      format: "a4",
-    });
+    const doc = new ctor({ orientation: "landscape", unit: "pt", format: "a4" });
 
-    // Header
+    // Title
     doc.setFontSize(14);
     doc.setTextColor(76, 29, 149); // Roku purple
     doc.text("Roku FAI Report", 14, 20);
 
+    // Meta line (now includes Overall)
     doc.setFontSize(10);
     doc.setTextColor(60, 60, 60);
     doc.text(
-      `Model: ${model || "-"} | Serial: ${serial || "-"} | Mfg: ${
-        mfg || "-"
-      } | ` + `Insp: ${insp || "-"} | Size: ${size} | Market: ${market}`,
+      `Model: ${model || "-"} | Serial: ${serial || "-"} | Mfg: ${mfg || "-"} | ` +
+        `Insp: ${insp || "-"} | Size: ${size} | Market: ${market} | Overall: ${
+          overall || "-"
+        }`,
       14,
       34
     );
 
-    // Table body
+    // Optional: big overall status line just under the meta
+    if (overall) {
+      if (overall === "PASS") {
+        doc.setTextColor(6, 95, 70); // green-ish
+      } else if (overall === "FAIL") {
+        doc.setTextColor(127, 29, 29); // red-ish
+      } else {
+        doc.setTextColor(120, 53, 15); // amber-ish for CONDITIONAL
+      }
+      doc.setFontSize(12);
+      doc.text(`FAI Overall Result: ${overall}`, 14, 48);
+    }
+
+    // Table data
     const tableRows = visibleRows.map((r) => [
       r.sec,
       r.item,
@@ -407,81 +416,15 @@ export default function App() {
     (doc as any).autoTable({
       head: [["Category", "Item", "Checkpoint", "Result", "JIRA", "Notes"]],
       body: tableRows,
-      startY: 42,
+      startY: overall ? 56 : 42, // push table down a bit if we printed overall line
       styles: { fontSize: 7 },
       headStyles: { fillColor: [76, 29, 149], textColor: [255, 255, 255] },
       alternateRowStyles: { fillColor: [245, 243, 255] },
     });
 
-    // Photos section
-    if (photos.length > 0) {
-      const lastY =
-        (doc as any).lastAutoTable?.finalY ??
-        60; // fallback in case autoTable missing
-
-      let x = 40;
-      let y = lastY + 30;
-
-    
-      const pageHeight = doc.internal.pageSize.getHeight();
-
-      const imgWidth = 160;
-      const imgHeight = 90;
-      const gapX = 20;
-      const gapY = 40;
-      const maxPerRow = 3;
-
-      doc.setFontSize(12);
-      doc.setTextColor(76, 29, 149);
-      doc.text("FAI Photos", 14, y - 15);
-
-      photos.forEach((p, idx) => {
-        // New row
-        if (idx % maxPerRow === 0 && idx !== 0) {
-          x = 40;
-          y += imgHeight + gapY;
-        }
-
-        // New page if not enough space
-        if (y + imgHeight + 40 > pageHeight) {
-          doc.addPage();
-          x = 40;
-          y = 60;
-          doc.setFontSize(12);
-          doc.setTextColor(76, 29, 149);
-          doc.text("FAI Photos (cont.)", 14, y - 15);
-        }
-
-        let format: "PNG" | "JPEG" = "JPEG";
-        if (p.dataUrl.startsWith("data:image/png")) {
-          format = "PNG";
-        }
-
-        try {
-          doc.addImage(p.dataUrl, format, x, y, imgWidth, imgHeight);
-        } catch {
-          // Fallback box if addImage fails
-          doc.setDrawColor(200);
-          doc.rect(x, y, imgWidth, imgHeight);
-          doc.setFontSize(8);
-          doc.setTextColor(150);
-          doc.text("Photo could not be embedded", x + 4, y + 12);
-        }
-
-        doc.setFontSize(8);
-        doc.setTextColor(60, 60, 60);
-        const caption =
-          p.caption && p.caption.trim()
-            ? p.caption.trim()
-            : `Photo ${idx + 1}`;
-        doc.text(caption, x, y + imgHeight + 10);
-
-        x += imgWidth + gapX;
-      });
-    }
-
     doc.save(`FAI_${sanitizeName(model)}_${sanitizeName(serial)}.pdf`);
   }
+
 
   /* ---------------- Add new item ---------------- */
   const [newSec, setNewSec] = useState(SECTIONS[0]);
