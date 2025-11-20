@@ -46,13 +46,6 @@ type Row = {
   note?: string;
 };
 
-type Meta = {
-  model: string;
-  serial: string;
-  mfg: string;
-  insp: string;
-  overall: string;
-};
 
 type RowSeed = { sec: string; item: string; cp: string };
 
@@ -326,8 +319,7 @@ export default function App() {
     setPhotos((p) => p.filter((x) => x.id !== id));
   }
 
-  const meta: Meta = { model, serial, mfg, insp, overall };
-
+  
   const visibleRows = useMemo<Row[]>(() => {
     const isCA = market === "CA";
     return allRows.filter((r) => (isCA ? true : !r.sec.includes("(CA Products)")));
