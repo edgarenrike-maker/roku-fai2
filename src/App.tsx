@@ -31,6 +31,7 @@ function ensurePWASetup() {
 }
 
 /* ------------------ helpers ------------------ */
+
 function sanitizeName(x: string) {
   return (x || "").replace(/[^a-z0-9_-]+/gi, "").slice(0, 40) || "NA";
 }
@@ -46,28 +47,18 @@ type Row = {
   note?: string;
 };
 
+
 // rows used to seed the app (no id/result fields yet)
 type RowSeed = { sec: string; item: string; cp: string };
 
 type Photo = {
   id: number;
-  dataUrl: string; // base64 Data URL for PDF export
+  dataUrl: string;
   caption: string;
 };
 
 /* ------------------ constants ------------------ */
-const TV_SIZES = [
-  "24in",
-  "32in",
-  "40in",
-  "43in",
-  "50in",
-  "55in",
-  "65in",
-  "70in",
-  "75in",
-  "85in",
-];
+const TV_SIZES = ["24in", "32in", "40in", "43in", "50in", "55in", "65in", "70in", "75in", "85in"];
 const MARKETS = ["US", "CA", "MX"];
 const SECTIONS = [
   "Packaging and Carton",
@@ -282,51 +273,37 @@ export default function App() {
   const [market, setMarket] = useState("US");
 
   const [allRows, setAllRows] = useState<Row[]>(() =>
-    FULL_CHECKLIST.map((r, i) => ({
-      ...r,
-      id: i + 1,
-      res: "",
-      jira: "",
-      note: "",
-    }))
+    FULL_CHECKLIST.map((r, i) => ({ ...r, id: i + 1, res: "", jira: "", note: "" }))
   );
 
   const [photos, setPhotos] = useState<Photo[]>([]);
 
-  // Read photos as base64 Data URLs (better for PDF export)
-  async function addPhotos(files: FileList | null) {
+  // Read images as data URLs so we can embed in PDF
+  function addPhotos(files: FileList | null) {
     if (!files) return;
-
-    const fileArray = Array.from(files);
-    const newPhotos: Photo[] = await Promise.all(
-      fileArray.map(
-        (file) =>
-          new Promise<Photo>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-              resolve({
-                id: Date.now() + Math.random(),
-                dataUrl: reader.result as string,
-                caption: "",
-              });
-            };
-            reader.readAsDataURL(file);
-          })
-      )
-    );
-
-    setPhotos((prev) => [...prev, ...newPhotos]);
+    Array.from(files).forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result;
+        if (typeof result === "string") {
+          setPhotos((prev) => [
+            ...prev,
+            { id: Date.now() + Math.random(), dataUrl: result, caption: "" },
+          ]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
   }
 
   function removePhoto(id: number) {
     setPhotos((p) => p.filter((x) => x.id !== id));
   }
 
+
   const visibleRows = useMemo<Row[]>(() => {
     const isCA = market === "CA";
-    return allRows.filter((r) =>
-      isCA ? true : !r.sec.includes("(CA Products)")
-    );
+    return allRows.filter((r) => (isCA ? true : !r.sec.includes("(CA Products)")));
   }, [allRows, market]);
 
   const oc = useMemo(() => overallCounts(visibleRows), [visibleRows]);
@@ -355,55 +332,73 @@ export default function App() {
   const expandAll = () => setCollapsed({});
 
   const setSectionRes = (sec: string, val: string) =>
-    setAllRows((prev) =>
-      prev.map((r) => (r.sec === sec ? { ...r, res: val } : r))
-    );
+    setAllRows((prev) => prev.map((r) => (r.sec === sec ? { ...r, res: val } : r)));
   const clearSectionRes = (sec: string) =>
-    setAllRows((prev) =>
-      prev.map((r) => (r.sec === sec ? { ...r, res: "" } : r))
-    );
+    setAllRows((prev) => prev.map((r) => (r.sec === sec ? { ...r, res: "" } : r)));
 
-  /* ---------------- PDF Export (table + photos) ---------------- */
-    function exportPDF() {
+  /* ---------------- PDF Export (CDN-safe) ---------------- */
+  function exportPDF() {
     const ctor = (window as any).jspdf?.jsPDF;
     if (!ctor) {
       alert("PDF engine not loaded. Check the two CDN <script> tags in index.html.");
       return;
     }
-
     const doc = new ctor({ orientation: "landscape", unit: "pt", format: "a4" });
 
-    // Title
-    doc.setFontSize(14);
-    doc.setTextColor(76, 29, 149); // Roku purple
-    doc.text("Roku FAI Report", 14, 20);
+    const stats = overallCounts(visibleRows);
+    const failedRows = visibleRows.filter((r) => r.res === "FAIL");
 
-    // Meta line (now includes Overall)
+    // Title
+    doc.setFontSize(18);
+    doc.setTextColor(76, 29, 149); // Roku purple
+    doc.text("Roku FAI Report", 14, 24);
+
+    // Meta line
     doc.setFontSize(10);
     doc.setTextColor(60, 60, 60);
     doc.text(
       `Model: ${model || "-"} | Serial: ${serial || "-"} | Mfg: ${mfg || "-"} | ` +
-        `Insp: ${insp || "-"} | Size: ${size} | Market: ${market} | Overall: ${
-          overall || "-"
-        }`,
+        `Insp: ${insp || "-"} | Size: ${size} | Market: ${market} | Overall: ${overall || "-"}`,
       14,
-      34
+      40
     );
 
-    // Optional: big overall status line just under the meta
-    if (overall) {
-      if (overall === "PASS") {
-        doc.setTextColor(6, 95, 70); // green-ish
-      } else if (overall === "FAIL") {
-        doc.setTextColor(127, 29, 29); // red-ish
-      } else {
-        doc.setTextColor(120, 53, 15); // amber-ish for CONDITIONAL
+    // Overall result + counts
+    doc.setFontSize(11);
+    doc.setTextColor(22, 101, 52); // green-ish
+    doc.text(
+      `FAI Overall Result: ${overall || "-"}` +
+        `  | Pass: ${stats.pass}` +
+        `  | Fail: ${stats.fail}` +
+        `  | N/A: ${stats.na}` +
+        `  | Open: ${stats.open}` +
+        `  | Pass %: ${stats.pct}%`,
+      14,
+      56
+    );
+
+    let startY = 72;
+
+    // If there are failures, list them briefly before the table
+    if (failedRows.length > 0) {
+      doc.setFontSize(10);
+      doc.setTextColor(153, 27, 27); // red-ish
+      doc.text("Failed items:", 14, startY);
+      let y = startY + 14;
+      const maxPreview = 8;
+      failedRows.slice(0, maxPreview).forEach((r) => {
+        const line = `• ${r.sec} — ${r.item}`;
+        doc.text(line, 24, y, { maxWidth: 760 });
+        y += 12;
+      });
+      if (failedRows.length > maxPreview) {
+        doc.text(`... +${failedRows.length - maxPreview} more`, 24, y);
+        y += 12;
       }
-      doc.setFontSize(12);
-      doc.text(`FAI Overall Result: ${overall}`, 14, 48);
+      startY = y + 6;
     }
 
-    // Table data
+    // Main table
     const tableRows = visibleRows.map((r) => [
       r.sec,
       r.item,
@@ -416,15 +411,68 @@ export default function App() {
     (doc as any).autoTable({
       head: [["Category", "Item", "Checkpoint", "Result", "JIRA", "Notes"]],
       body: tableRows,
-      startY: overall ? 56 : 42, // push table down a bit if we printed overall line
+      startY,
       styles: { fontSize: 7 },
       headStyles: { fillColor: [76, 29, 149], textColor: [255, 255, 255] },
       alternateRowStyles: { fillColor: [245, 243, 255] },
     });
 
-    doc.save(`FAI_${sanitizeName(model)}_${sanitizeName(serial)}.pdf`);
-  }
+    // Photo page(s)
+    if (photos.length > 0) {
+      doc.addPage();
+      doc.setFontSize(16);
+      doc.setTextColor(76, 29, 149);
+      doc.text("FAI Photos", 14, 28);
 
+      const margin = 24;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const usableWidth = pageWidth - margin * 2;
+      const imgWidth = usableWidth / 2 - 10; // two per row
+      const imgHeight = 160;
+
+      let x = margin;
+      let yImg = 48;
+
+      doc.setFontSize(10);
+      doc.setTextColor(60, 60, 60);
+
+      photos.forEach((p, index) => {
+        const format = p.dataUrl.startsWith("data:image/png") ? "PNG" : "JPEG";
+
+        // If not enough vertical space, new page
+        if (yImg + imgHeight + 40 > pageHeight) {
+          doc.addPage();
+          doc.setFontSize(10);
+          doc.setTextColor(60, 60, 60);
+          x = margin;
+          yImg = 48;
+        }
+
+        doc.addImage(p.dataUrl, format, x, yImg, imgWidth, imgHeight);
+
+        if (p.caption) {
+          doc.text(p.caption, x, yImg + imgHeight + 14, {
+            maxWidth: imgWidth,
+          });
+        }
+
+        // Move to next column / row
+        if (index % 2 === 0) {
+          x = margin + imgWidth + 20; // second column
+        } else {
+          x = margin;
+          yImg += imgHeight + 50; // next row
+        }
+      });
+    }
+
+    doc.save(
+      `FAI_${sanitizeName(model)}_${sanitizeName(serial)}_${sanitizeName(size)}_${sanitizeName(
+        market
+      )}.pdf`
+    );
+  }
 
   /* ---------------- Add new item ---------------- */
   const [newSec, setNewSec] = useState(SECTIONS[0]);
@@ -615,7 +663,7 @@ export default function App() {
                   padding: "8px",
                   borderTop: "1px solid #e5e7eb",
                   position: "sticky",
-                  top: 36, // just below header row
+                  top: 36,
                   zIndex: 2,
                 }}
               >
@@ -632,18 +680,12 @@ export default function App() {
                   {collapsed[section.sec] ? "▶" : "▼"} {section.sec}
                 </button>
 
-                <div
-                  style={{ display: "flex", gap: "6px", alignItems: "center" }}
-                >
+                <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                   <div style={BADGE}>All {c.total}</div>
-                  <div
-                    style={{ ...BADGE, background: "#ecfdf5", color: "#065f46" }}
-                  >
+                  <div style={{ ...BADGE, background: "#ecfdf5", color: "#065f46" }}>
                     Pass {c.pass}
                   </div>
-                  <div
-                    style={{ ...BADGE, background: "#fef2f2", color: "#7f1d1d" }}
-                  >
+                  <div style={{ ...BADGE, background: "#fef2f2", color: "#7f1d1d" }}>
                     Fail {c.fail}
                   </div>
                   <button
@@ -679,19 +721,13 @@ export default function App() {
                       borderTop: "1px solid #e5e7eb",
                     }}
                   >
-                    <input
-                      style={{ ...CELL, background: "#f9fafb" }}
-                      value={r.sec}
-                      readOnly
-                    />
+                    <input style={{ ...CELL, background: "#f9fafb" }} value={r.sec} readOnly />
                     <input
                       style={CELL}
                       value={r.item}
                       onChange={(e) =>
                         setAllRows((prev) =>
-                          prev.map((x) =>
-                            x.id === r.id ? { ...x, item: e.target.value } : x
-                          )
+                          prev.map((x) => (x.id === r.id ? { ...x, item: e.target.value } : x))
                         )
                       }
                     />
@@ -700,9 +736,7 @@ export default function App() {
                       value={r.cp}
                       onChange={(e) =>
                         setAllRows((prev) =>
-                          prev.map((x) =>
-                            x.id === r.id ? { ...x, cp: e.target.value } : x
-                          )
+                          prev.map((x) => (x.id === r.id ? { ...x, cp: e.target.value } : x))
                         )
                       }
                     />
@@ -711,9 +745,7 @@ export default function App() {
                       value={r.res || ""}
                       onChange={(e) =>
                         setAllRows((prev) =>
-                          prev.map((x) =>
-                            x.id === r.id ? { ...x, res: e.target.value } : x
-                          )
+                          prev.map((x) => (x.id === r.id ? { ...x, res: e.target.value } : x))
                         )
                       }
                     >
@@ -728,9 +760,7 @@ export default function App() {
                       value={r.jira || ""}
                       onChange={(e) =>
                         setAllRows((prev) =>
-                          prev.map((x) =>
-                            x.id === r.id ? { ...x, jira: e.target.value } : x
-                          )
+                          prev.map((x) => (x.id === r.id ? { ...x, jira: e.target.value } : x))
                         )
                       }
                     />
@@ -739,9 +769,7 @@ export default function App() {
                       value={r.note || ""}
                       onChange={(e) =>
                         setAllRows((prev) =>
-                          prev.map((x) =>
-                            x.id === r.id ? { ...x, note: e.target.value } : x
-                          )
+                          prev.map((x) => (x.id === r.id ? { ...x, note: e.target.value } : x))
                         )
                       }
                     />
@@ -761,9 +789,7 @@ export default function App() {
           borderRadius: 10,
         }}
       >
-        <h3 style={{ fontSize: 14, marginBottom: 6 }}>
-          Add New Inspection Item
-        </h3>
+        <h3 style={{ fontSize: 14, marginBottom: 6 }}>Add New Inspection Item</h3>
         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
           <select
             style={{ ...CELL, flex: "1" }}
@@ -786,24 +812,14 @@ export default function App() {
             value={newCp}
             onChange={(e) => setNewCp(e.target.value)}
           />
-          <button
-            style={{ ...CELL, flex: "0.5", cursor: "pointer" }}
-            onClick={addNewRow}
-          >
+          <button style={{ ...CELL, flex: "0.5", cursor: "pointer" }} onClick={addNewRow}>
             Add
           </button>
         </div>
       </div>
 
       {/* Actions */}
-      <div
-        style={{
-          display: "flex",
-          gap: "8px",
-          marginTop: "8px",
-          flexWrap: "wrap",
-        }}
-      >
+      <div style={{ display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
         <button style={{ ...CELL, padding: "8px 12px" }} onClick={collapseAll}>
           Collapse all
         </button>
@@ -811,13 +827,7 @@ export default function App() {
           Expand all
         </button>
         <button
-          style={{
-            ...CELL,
-            padding: "8px 12px",
-            background: "#f3e8ff",
-            color: "#4c1d95",
-            cursor: "pointer",
-          }}
+          style={{ ...CELL, padding: "8px 12px", background: "#f3e8ff", color: "#4c1d95", cursor: "pointer" }}
           onClick={exportPDF}
         >
           Export PDF
@@ -837,12 +847,7 @@ export default function App() {
           <h3 style={{ fontSize: 14 }}>FAI Photos</h3>
           <span style={BADGE}>Total {photos.length}</span>
         </div>
-        <input
-          type="file"
-          multiple
-          accept="image/*"
-          onChange={(e) => addPhotos(e.target.files)}
-        />
+        <input type="file" multiple accept="image/*" onChange={(e) => addPhotos(e.target.files)} />
         <div
           style={{
             display: "grid",
@@ -852,10 +857,7 @@ export default function App() {
           }}
         >
           {photos.map((p) => (
-            <div
-              key={p.id}
-              style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}
-            >
+            <div key={p.id} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}>
               <img src={p.dataUrl} style={{ width: "100%", borderRadius: 6 }} />
               <input
                 style={{ ...CELL, marginTop: 6 }}
@@ -863,9 +865,7 @@ export default function App() {
                 value={p.caption}
                 onChange={(e) =>
                   setPhotos((prev) =>
-                    prev.map((x) =>
-                      x.id === p.id ? { ...x, caption: e.target.value } : x
-                    )
+                    prev.map((x) => (x.id === p.id ? { ...x, caption: e.target.value } : x))
                   )
                 }
               />
@@ -904,6 +904,3 @@ function Field({
     </div>
   );
 }
-
-
-
