@@ -31,7 +31,6 @@ function ensurePWASetup() {
 }
 
 /* ------------------ helpers ------------------ */
-
 function sanitizeName(x: string) {
   return (x || "").replace(/[^a-z0-9_-]+/gi, "").slice(0, 40) || "NA";
 }
@@ -47,12 +46,19 @@ type Row = {
   note?: string;
 };
 
+type Meta = {
+  model: string;
+  serial: string;
+  mfg: string;
+  insp: string;
+  overall: string;
+};
+
 type RowSeed = { sec: string; item: string; cp: string };
 
 type Photo = {
   id: number;
-  url: string;      // object URL for on-screen preview
-  dataUrl?: string; // base64 for PDF export
+  dataUrl: string;
   caption: string;
 };
 
@@ -81,7 +87,7 @@ const SECTIONS = [
   "Functional (CA Products)",
 ];
 
-const COLS = "1.6fr 2.6fr 5fr 0.9fr 1.1fr 1.4fr";
+const COLS = "1.6fr 2.6fr 5fr 1.1fr 1.5fr 2.1fr";
 
 const CELL: React.CSSProperties = {
   padding: "6px",
@@ -90,22 +96,13 @@ const CELL: React.CSSProperties = {
   width: "100%",
   fontSize: "13px",
   boxSizing: "border-box",
-  background: "#fff",
-  whiteSpace: "normal",
-  overflowWrap: "break-word",
-};
-
-const TEXTAREA_CELL: React.CSSProperties = {
-  ...CELL,
-  minHeight: "48px",
-  resize: "vertical",
 };
 
 const HDR: React.CSSProperties = {
   textAlign: "center",
   fontWeight: 600,
   fontSize: "12px",
-  background: "#f3f0ff", // light purple
+  background: "#f3f0ff",
   color: "#4c1d95",
   padding: "8px 4px",
   borderBottom: "1px solid #e5e7eb",
@@ -178,7 +175,7 @@ function overallCounts(rows: Row[]) {
 }
 
 /* --------------------------- checklist (99) --------------------------- */
-/* (same checklist you already had – unchanged content) */
+/* (Same FULL_CHECKLIST you already have – leaving as-is) */
 const FULL_CHECKLIST: RowSeed[] = [
   { sec: "Packaging and Carton", item: "1. Gift box Cosmetic inspection", cp: "Check for dents, scratches, smudges, or misprinted artwork on the gift box." },
   { sec: "Packaging and Carton", item: "2. Gift box pantone color check", cp: "Verify carton color matches Pantone master standard (DeltaE <= 1.0)." },
@@ -309,35 +306,27 @@ export default function App() {
 
   function addPhotos(files: FileList | null) {
     if (!files) return;
-    Array.from(files).forEach((file) => {
-      const id = Date.now() + Math.random();
-      const url = URL.createObjectURL(file);
-
-      // Add placeholder photo for UI
-      const basePhoto: Photo = { id, url, caption: "" };
-      setPhotos((prev) => [...prev, basePhoto]);
-
-      // Load data URL for PDF export
+    const list: Photo[] = [];
+    Array.from(files).forEach((f) => {
       const reader = new FileReader();
       reader.onload = () => {
-        const dataUrl = reader.result as string;
-        setPhotos((prev) =>
-          prev.map((p) => (p.id === id ? { ...p, dataUrl } : p))
-        );
+        list.push({
+          id: Date.now() + Math.random(),
+          dataUrl: String(reader.result),
+          caption: "",
+        });
+        // push after file is loaded
+        setPhotos((p) => [...p, ...list]);
       };
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(f);
     });
   }
 
   function removePhoto(id: number) {
-    setPhotos((prev) => {
-      const target = prev.find((x) => x.id === id);
-      if (target) {
-        URL.revokeObjectURL(target.url);
-      }
-      return prev.filter((x) => x.id !== id);
-    });
+    setPhotos((p) => p.filter((x) => x.id !== id));
   }
+
+  const meta: Meta = { model, serial, mfg, insp, overall };
 
   const visibleRows = useMemo<Row[]>(() => {
     const isCA = market === "CA";
@@ -345,7 +334,6 @@ export default function App() {
   }, [allRows, market]);
 
   const oc = useMemo(() => overallCounts(visibleRows), [visibleRows]);
-
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const sections = useMemo(() => {
@@ -363,15 +351,18 @@ export default function App() {
 
   const toggleSection = (sec: string) =>
     setCollapsed((p) => ({ ...p, [sec]: !p[sec] }));
+
   const collapseAll = () => {
     const m: Record<string, boolean> = {};
     sections.forEach((s) => (m[s.sec] = true));
     setCollapsed(m);
   };
+
   const expandAll = () => setCollapsed({});
 
   const setSectionRes = (sec: string, val: string) =>
     setAllRows((prev) => prev.map((r) => (r.sec === sec ? { ...r, res: val } : r)));
+
   const clearSectionRes = (sec: string) =>
     setAllRows((prev) => prev.map((r) => (r.sec === sec ? { ...r, res: "" } : r)));
 
@@ -379,70 +370,69 @@ export default function App() {
   function exportPDF() {
     const ctor = (window as any).jspdf?.jsPDF;
     if (!ctor) {
-      alert("PDF engine not loaded. Check the two CDN <script> tags in index.html.");
+      alert(
+        "PDF engine not loaded. Check the two CDN <script> tags in index.html."
+      );
       return;
     }
+
     const doc = new ctor({
       orientation: "landscape",
       unit: "pt",
       format: "a4",
     });
 
-    // Header
-    doc.setFontSize(18);
+    const failRows = visibleRows.filter((r) => r.res === "FAIL");
+
+    doc.setFontSize(16);
     doc.setTextColor(76, 29, 149);
-    doc.text("Roku FAI Report", 14, 24);
+    doc.text("Roku FAI Report", 40, 32);
 
     doc.setFontSize(10);
     doc.setTextColor(60, 60, 60);
     doc.text(
-      `Model: ${model || "-"} | Serial: ${serial || "-"} | Mfg: ${
+      `Model: ${model || "-"}  |  Serial: ${serial || "-"}  |  Mfg: ${
         mfg || "-"
-      } | Insp: ${insp || "-"} | Size: ${size} | Market: ${market} | Overall: ${
-        overall || "-"
-      }`,
-      14,
-      40
+      }  |  Insp: ${insp || "-"}  |  Size: ${size}  |  Market: ${market}`,
+      40,
+      48
     );
 
-    const counts = overallCounts(visibleRows);
+    doc.setFontSize(11);
+    doc.setTextColor(34, 197, 94); // green
+    doc.text(`FAI Overall Result: ${overall || "-"}`, 40, 64);
 
-    // Overall result line with color
-    let overallColor: [number, number, number] = [6, 95, 46]; // green
-    if (overall === "FAIL") overallColor = [127, 29, 29];
-    if (overall === "CONDITIONAL APPROVAL") overallColor = [120, 53, 15];
-
-    doc.setFontSize(12);
-    doc.setTextColor(...overallColor);
+    doc.setFontSize(9);
+    doc.setTextColor(55, 65, 81);
     doc.text(
-      `FAI Overall Result: ${overall || "-"} | Pass: ${counts.pass} | Fail: ${
-        counts.fail
-      } | N/A: ${counts.na} | Open: ${counts.open} | Pass %: ${counts.pct}%`,
-      14,
-      56
+      `Pass: ${oc.pass}    Fail: ${oc.fail}    N/A: ${oc.na}    Open: ${oc.open}    Pass %: ${oc.pct}%`,
+      40,
+      80
     );
 
-    // List FAIL items (if any)
-    const failRows = visibleRows.filter((r) => r.res === "FAIL");
-    let tableStartY = 72;
-
+    let summaryY = 96;
     if (failRows.length > 0) {
-      doc.setFontSize(11);
-      doc.setTextColor(127, 29, 29);
-      doc.text("Fail items:", 14, 72);
-
-      doc.setFontSize(8);
-      let y = 84;
-      failRows.forEach((r) => {
-        const label = `- ${r.item} (${r.sec})`;
-        doc.text(label, 18, y);
-        y += 10;
+      doc.setTextColor(220, 38, 38);
+      doc.text("Failed items:", 40, summaryY);
+      summaryY += 14;
+      doc.setTextColor(55, 65, 81);
+      failRows.slice(0, 20).forEach((r) => {
+        const line = `• [${r.sec}] ${r.item}`;
+        doc.text(line, 50, summaryY);
+        summaryY += 12;
       });
-
-      tableStartY = y + 8;
+      if (failRows.length > 20) {
+        doc.text(
+          `...and ${failRows.length - 20} more.`,
+          50,
+          summaryY + 4
+        );
+      }
+    } else {
+      doc.setTextColor(22, 163, 74);
+      doc.text("No failed items recorded in this FAI.", 40, summaryY);
     }
 
-    // Main checklist table
     const tableRows = visibleRows.map((r) => [
       r.sec,
       r.item,
@@ -455,58 +445,19 @@ export default function App() {
     (doc as any).autoTable({
       head: [["Category", "Item", "Checkpoint", "Result", "JIRA", "Notes"]],
       body: tableRows,
-      startY: tableStartY,
+      startY: summaryY + 20,
       styles: { fontSize: 7 },
       headStyles: { fillColor: [76, 29, 149], textColor: [255, 255, 255] },
       alternateRowStyles: { fillColor: [245, 243, 255] },
     });
 
-    // Photos page
-    if (photos.length > 0) {
-      doc.addPage();
-      doc.setFontSize(14);
-      doc.setTextColor(76, 29, 149);
-      doc.text("FAI Photos", 14, 24);
-
-      let x = 14;
-      let y = 50;
-      const imgW = 160;
-      const imgH = 90;
-
-      photos.forEach((p) => {
-        if (!p.dataUrl) return;
-
-        const isPng = p.dataUrl.startsWith("data:image/png");
-        const fmt = isPng ? "PNG" : "JPEG";
-
-        doc.addImage(p.dataUrl, fmt, x, y, imgW, imgH);
-
-        if (p.caption) {
-          doc.setFontSize(8);
-          doc.setTextColor(55, 65, 81);
-          doc.text(p.caption, x, y + imgH + 12, { maxWidth: imgW });
-        }
-
-        x += imgW + 16;
-        if (x + imgW > 800) {
-          x = 14;
-          y += imgH + 40;
-          if (y + imgH > 550) {
-            doc.addPage();
-            x = 14;
-            y = 50;
-          }
-        }
-      });
-    }
-
-    const filename = `FAI_${sanitizeName(model)}_${sanitizeName(
+    const fn = `FAI_${sanitizeName(model)}_${sanitizeName(
       serial
     )}_${sanitizeName(size)}_${sanitizeName(market)}_${new Date()
       .toISOString()
       .slice(0, 10)}.pdf`;
 
-    doc.save(filename);
+    doc.save(fn);
   }
 
   /* ---------------- Add new item ---------------- */
@@ -653,57 +604,61 @@ export default function App() {
         </div>
       </div>
 
+      {/* Global controls above checklist */}
+      <div
+        style={{
+          display: "flex",
+          gap: "8px",
+          marginTop: "8px",
+          marginBottom: "4px",
+          justifyContent: "flex-end",
+        }}
+      >
+        <button
+          style={{ ...CELL, padding: "6px 10px", maxWidth: 130, cursor: "pointer" }}
+          onClick={collapseAll}
+        >
+          Collapse all
+        </button>
+        <button
+          style={{ ...CELL, padding: "6px 10px", maxWidth: 130, cursor: "pointer" }}
+          onClick={expandAll}
+        >
+          Expand all
+        </button>
+        <button
+          style={{
+            ...CELL,
+            padding: "6px 10px",
+            maxWidth: 140,
+            cursor: "pointer",
+            background: "#f3e8ff",
+            color: "#4c1d95",
+          }}
+          onClick={exportPDF}
+        >
+          Export PDF
+        </button>
+      </div>
+
       {/* Checklist container (scrollable) */}
       <div
         style={{
           border: "1px solid #e5e7eb",
           borderRadius: "10px",
-          marginTop: "8px",
+          marginTop: "4px",
           maxHeight: "70vh",
           overflowY: "auto",
           overflowX: "auto",
           position: "relative",
         }}
       >
-        {/* Sticky control bar (collapse / expand) */}
-        <div
-          style={{
-            position: "sticky",
-            top: 0,
-            zIndex: 40,
-            background: "#f9fafb",
-            borderBottom: "1px solid #e5e7eb",
-            padding: "6px 8px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <span style={{ fontSize: 12, fontWeight: 600, color: "#4c1d95" }}>
-            Checklist controls
-          </span>
-          <div style={{ display: "flex", gap: "8px" }}>
-            <button
-              style={{ ...CELL, padding: "4px 8px", cursor: "pointer" }}
-              onClick={expandAll}
-            >
-              Expand all
-            </button>
-            <button
-              style={{ ...CELL, padding: "4px 8px", cursor: "pointer" }}
-              onClick={collapseAll}
-            >
-              Collapse all
-            </button>
-          </div>
-        </div>
-
         {/* Sticky column header */}
         <div
           style={{
             position: "sticky",
-            top: 32,
-            zIndex: 35,
+            top: 0,
+            zIndex: 30,
             background: "#f3f0ff",
             borderBottom: "1px solid #e5e7eb",
           }}
@@ -731,8 +686,8 @@ export default function App() {
                   padding: "8px",
                   borderTop: "1px solid #e5e7eb",
                   position: "sticky",
-                  top: 64, // sits below control bar + header
-                  zIndex: 30,
+                  top: 36,
+                  zIndex: 2,
                 }}
               >
                 <button
@@ -760,6 +715,11 @@ export default function App() {
                   >
                     Fail {c.fail}
                   </div>
+                  <div
+                    style={{ ...BADGE, background: "#e5e7eb", color: "#374151" }}
+                  >
+                    N/A {c.na}
+                  </div>
                   <button
                     onClick={() => setSectionRes(section.sec, "PASS")}
                     style={{ ...CELL, padding: "4px 8px", cursor: "pointer" }}
@@ -771,6 +731,12 @@ export default function App() {
                     style={{ ...CELL, padding: "4px 8px", cursor: "pointer" }}
                   >
                     All FAIL
+                  </button>
+                  <button
+                    onClick={() => setSectionRes(section.sec, "N/A")}
+                    style={{ ...CELL, padding: "4px 8px", cursor: "pointer" }}
+                  >
+                    All N/A
                   </button>
                   <button
                     onClick={() => clearSectionRes(section.sec)}
@@ -810,7 +776,12 @@ export default function App() {
                       }
                     />
                     <textarea
-                      style={TEXTAREA_CELL}
+                      style={{
+                        ...CELL,
+                        resize: "vertical",
+                        minHeight: 48,
+                        whiteSpace: "pre-wrap",
+                      }}
                       value={r.cp}
                       onChange={(e) =>
                         setAllRows((prev) =>
@@ -838,7 +809,12 @@ export default function App() {
                       <option>N/A</option>
                     </select>
                     <textarea
-                      style={TEXTAREA_CELL}
+                      style={{
+                        ...CELL,
+                        resize: "vertical",
+                        minHeight: 40,
+                        whiteSpace: "pre-wrap",
+                      }}
                       value={r.jira || ""}
                       onChange={(e) =>
                         setAllRows((prev) =>
@@ -849,7 +825,12 @@ export default function App() {
                       }
                     />
                     <textarea
-                      style={TEXTAREA_CELL}
+                      style={{
+                        ...CELL,
+                        resize: "vertical",
+                        minHeight: 40,
+                        whiteSpace: "pre-wrap",
+                      }}
                       value={r.note || ""}
                       onChange={(e) =>
                         setAllRows((prev) =>
@@ -907,29 +888,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* Actions (now only Export PDF, collapse/expand moved up) */}
-      <div
-        style={{
-          display: "flex",
-          gap: "8px",
-          marginTop: "8px",
-          flexWrap: "wrap",
-        }}
-      >
-        <button
-          style={{
-            ...CELL,
-            padding: "8px 12px",
-            background: "#f3e8ff",
-            color: "#4c1d95",
-            cursor: "pointer",
-          }}
-          onClick={exportPDF}
-        >
-          Export PDF
-        </button>
-      </div>
-
       {/* Photos */}
       <div
         style={{
@@ -960,15 +918,15 @@ export default function App() {
           {photos.map((p) => (
             <div
               key={p.id}
-              style={{
-                border: "1px solid #e5e7eb",
-                borderRadius: 8,
-                padding: 8,
-              }}
+              style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}
             >
-              <img src={p.url} style={{ width: "100%", borderRadius: 6 }} />
-              <textarea
-                style={{ ...TEXTAREA_CELL, marginTop: 6 }}
+              <img
+                src={p.dataUrl}
+                style={{ width: "100%", borderRadius: 6 }}
+                alt="FAI"
+              />
+              <input
+                style={{ ...CELL, marginTop: 6 }}
                 placeholder="Caption"
                 value={p.caption}
                 onChange={(e) =>
