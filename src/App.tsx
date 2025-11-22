@@ -31,11 +31,11 @@ function ensurePWASetup() {
 }
 
 /* ------------------ helpers ------------------ */
+
 function sanitizeName(x: string) {
   return (x || "").replace(/[^a-z0-9_-]+/gi, "").slice(0, 40) || "NA";
 }
 
-/* ------------------ types ------------------ */
 type Row = {
   id: number;
   sec: string;
@@ -46,16 +46,14 @@ type Row = {
   note?: string;
 };
 
-
 type RowSeed = { sec: string; item: string; cp: string };
 
 type Photo = {
   id: number;
-  dataUrl: string;
+  url: string;
   caption: string;
 };
 
-/* ------------------ constants ------------------ */
 const TV_SIZES = [
   "24in",
   "32in",
@@ -69,6 +67,7 @@ const TV_SIZES = [
   "85in",
 ];
 const MARKETS = ["US", "CA", "MX"];
+
 const SECTIONS = [
   "Packaging and Carton",
   "Accessories",
@@ -80,10 +79,10 @@ const SECTIONS = [
   "Functional (CA Products)",
 ];
 
-const COLS = "1.6fr 2.6fr 5fr 1.1fr 1.5fr 2.1fr";
+const COLS = "1.6fr 2.6fr 5fr 1.1fr 1.4fr 1.6fr";
 
 const CELL: React.CSSProperties = {
-  padding: "6px",
+  padding: "6px 8px",
   border: "1px solid #e5e7eb",
   borderRadius: "8px",
   width: "100%",
@@ -168,108 +167,532 @@ function overallCounts(rows: Row[]) {
 }
 
 /* --------------------------- checklist (99) --------------------------- */
-/* (Same FULL_CHECKLIST you already have – leaving as-is) */
 const FULL_CHECKLIST: RowSeed[] = [
-  { sec: "Packaging and Carton", item: "1. Gift box Cosmetic inspection", cp: "Check for dents, scratches, smudges, or misprinted artwork on the gift box." },
-  { sec: "Packaging and Carton", item: "2. Gift box pantone color check", cp: "Verify carton color matches Pantone master standard (DeltaE <= 1.0)." },
-  { sec: "Packaging and Carton", item: "3. Gift box label and QR code reading", cp: "Ensure labels and QR codes are legible, properly placed, and scannable." },
-  { sec: "Packaging and Carton", item: "4. Gift box artwork match with drawing", cp: "Artwork matches latest approved drawing and revision." },
-  { sec: "Packaging and Carton", item: "5. Gift box sealing tape well sealed", cp: "Verify tape fully sealed, straight, and not overlapping print areas." },
-  { sec: "Packaging and Carton", item: "6. Pack doc is well placed on top foam", cp: "Packing document placed per spec and visible when unboxing." },
-  { sec: "Packaging and Carton", item: "7. Straps tight, right location", cp: "Straps tight; correct location; no twisting or missing straps." },
-  { sec: "Packaging and Carton", item: "8. Feet bags in place and in good condition", cp: "Feet bags in correct location; no tears or missing components." },
-  { sec: "Packaging and Carton", item: "9. Internal straps", cp: "Straps tight; correct location; no twisting or missing straps." },
-  { sec: "Packaging and Carton", item: "10. Hexcomb cardboard is installed", cp: "Hexcomb installed securely; no gaps/deformation." },
-  { sec: "Packaging and Carton", item: "11. Internal Bag Supports TV unboxing", cp: "Internal bag supports placed and intact; no tears." },
-  { sec: "Packaging and Carton", item: "12. Protective cardboard is installed", cp: "Protective cardboard installed; no missing pieces." },
-  { sec: "Packaging and Carton", item: "13. Styrofoam inserts no missing /damage (EPS)", cp: "EPS inserts present, undamaged, correct orientation." },
-  { sec: "Packaging and Carton", item: "14. TV bag well taped/folded down", cp: "TV bag folded neatly and taped down securely." },
-  { sec: "Packaging and Carton", item: "15. correct Belly band P/N and color consistent", cp: "Belly band P/N and color match the approved spec." },
-  { sec: "Packaging and Carton", item: "16. Correct pack document assembly order", cp: "Verify appearance, placement, and conformity to drawing/specification." },
-  { sec: "Packaging and Carton", item: "17. correct envelop P/N and color", cp: "Envelope color and part number per spec." },
-  { sec: "Packaging and Carton", item: "18. correct QSG part number and artwork", cp: "Artwork matches latest approved drawing and revision." },
-  { sec: "Packaging and Carton", item: "19. QSG Folding and Placement", cp: "QSG folded per spec; fits flat; orientation per master; no wrinkles/tears." },
-  { sec: "Packaging and Carton", item: "20. QSG Content Verification", cp: "Approved rev; correct language/model/content; no outdated info." },
-  { sec: "Packaging and Carton", item: "21. PIF part number and artwork", cp: "Artwork matches latest approved drawing and revision." },
-  { sec: "Packaging and Carton", item: "22. Audio inserts P/N and artwork", cp: "Artwork matches latest approved drawing and revision." },
-  { sec: "Packaging and Carton", item: "23. I love Roku sticker good quality", cp: "Printed cleanly; no fading or peeling." },
-  { sec: "Accessories", item: "24. Accessories bag/box no damage", cp: "Accessory box complete and undamaged." },
-  { sec: "Accessories", item: "25. use correct remotes", cp: "Confirm correct remote model included and functions." },
-  { sec: "Accessories", item: "26. use correct screws", cp: "Ensure correct screw type, length, and quantity used." },
-  { sec: "Accessories", item: "27. clamp, USB, power cable good quality", cp: "Plug USB; device detected within 3s; files readable; no port looseness." },
-  { sec: "Labeling & Regulatory Checks", item: "28. Serial/Model Label Placement", cp: "Correct SKU/SN/model; within window; strong adhesion (peel test)." },
-  { sec: "Labeling & Regulatory Checks", item: "29. ESN Label", cp: "Back-cover ESN matches on-screen; barcode scans; no print errors." },
-  { sec: "Labeling & Regulatory Checks", item: "30. Barcode Scannability", cp: "All barcodes (SN/MAC/carton) scan first pass." },
-  { sec: "Labeling & Regulatory Checks", item: "31. Regulatory/EMI Labels", cp: "Correct regional marks (FCC/UL/NOM/DOE/ENERGY STAR, etc.)." },
-  { sec: "Labeling & Regulatory Checks", item: "32. Energy Label (DOE/FTC/NOM-032)", cp: "Rev/design match art; placed correctly; not obstructed." },
-  { sec: "Labeling & Regulatory Checks", item: "33. Warning/Caution Labels", cp: "Required warnings present, legible, correctly located." },
-  { sec: "Labeling & Regulatory Checks", item: "34. Back Cover Film & Brand", cp: "Correct logo, surface film, alignment." },
-  { sec: "Labeling & Regulatory Checks", item: "35. I/O port and label quality", cp: "Port labels printed clearly; match drawing." },
-  { sec: "Labeling & Regulatory Checks", item: "36. Labels, energy and rating label", cp: "Placement & legibility; matches gift box & spec." },
-  { sec: "Labeling & Regulatory Checks", item: "37. Device label and QR code", cp: "SN/MAC/SKU consistent with carton; scannable." },
-  { sec: "Labeling & Regulatory Checks", item: "38. Laser backplate artwork", cp: "Artwork revision & cosmetic quality per drawing." },
-  { sec: "Labeling & Regulatory Checks", item: "39. Logo no damage, scratch, discoloration", cp: "Correct color, adhesion, alignment." },
-  { sec: "Labeling & Regulatory Checks", item: "40. Regulatory Label Compliant (Back of TV)", cp: "FCC/UL/NOM/DOE compliance; placement & durability." },
-  { sec: "Mechanical", item: "41. Stand good quality (heat sealed)", cp: "Stand strength, weld quality, heat seal integrity." },
-  { sec: "Mechanical", item: "42. Feet CMF", cp: "Surface finish, color, texture per BOM." },
-  { sec: "Mechanical", item: "43. Feet slide into slots correctly", cp: "Proper fit; alignment & engagement." },
-  { sec: "Mechanical", item: "44. Thumbscrews engage smoothly and tighten securely", cp: "Correct thread; no cross-thread/strip." },
-  { sec: "Mechanical", item: "45. Positioning Guide Installed correctly", cp: "Fit & placement; no interference." },
-  { sec: "Mechanical", item: "46. Screen/Panel no quality issues", cp: "Flatness; secure mount; no cracks/pressure." },
-  { sec: "Mechanical", item: "47. Open Cell tape correctly placed", cp: "Adhesion/positioning; no air/wrinkles." },
-  { sec: "Mechanical", item: "48. Protective film on bezels well taped", cp: "Good adhesion & coverage; tab accessible." },
-  { sec: "Mechanical", item: "49. Bezel texture and color", cp: "Match golden sample & tooling rev." },
-  { sec: "Mechanical", item: "50. DECO Bezel", cp: "Decorative bezel surface, gloss, attachment." },
-  { sec: "Mechanical", item: "51. Back cover good quality", cp: "Material integrity; warpage; screw/clip engagement." },
-  { sec: "Mechanical", item: "52. Velcro straps attached to back cover", cp: "Strength and proper routing." },
-  { sec: "Mechanical", item: "53. Speaker grill no physical damage", cp: "Alignment/integrity; no gaps/deformation." },
-  { sec: "Mechanical", item: "54. Power socket good quality", cp: "Secure retention; alignment; electrical fit." },
-  { sec: "Mechanical", item: "55. All TV screws without damage", cp: "Correct torque; no stripped/loose screws." },
-  { sec: "Mechanical", item: "56. Install feet same size screws for foot fit check", cp: "Correct screw type/torque; fixture alignment." },
-  { sec: "Mechanical", item: "57. Overall TV Dimensions (Width x Height x Depth)", cp: "Verify overall assembly vs. box reference." },
-  { sec: "Functional", item: "58. Boots to App Image", cp: "Boot to Roku home ≤5s; logo/animation OK." },
-  { sec: "Functional", item: "59. Correct Brand UI", cp: "Correct skin; layout/colors/icons match build." },
-  { sec: "Functional", item: "60. Remote control works (IR/ RF)", cp: "IR+BLE pairing; all keys respond." },
-  { sec: "Functional", item: "61. Follow OOBA steps to connect WIFI and test", cp: "2.4G/5G connect OK; update prompt if any." },
-  { sec: "Functional", item: "62. check software version", cp: "Build number vs release plan/golden sample." },
-  { sec: "Functional", item: "63. Guided Setup Completes", cp: "End-to-end OK; no crash/reboot." },
-  { sec: "Functional", item: "64. Factory Reset using Reset button", cp: "Hold 10s; boots to OOBE." },
-  { sec: "Functional", item: "65. adjusting volume to check sound no quality issues", cp: "Sound clean; no artifacts; mapping OK." },
-  { sec: "Functional", item: "66. power on/off no image, sound quality issues", cp: "Cycles smoothly; no flicker/relay click." },
-  { sec: "Functional", item: "67. No PSU AC noise issue during power on/standby", cp: "No coil whine/buzz on power/standby." },
-  { sec: "Functional", item: "68. No light leakage at dark screen, no shiny spot, bad pixel", cp: "Dark-room: no edge/back leaks; no bright spots/mura." },
-  { sec: "Functional", item: "69. No Light leakage thru back cover gaps", cp: "Dark-room: no light through back-cover gaps." },
-  { sec: "Functional", item: "70. adjusting brightness, contrast no display quality issues", cp: "Adjustments apply w/o flicker/instability." },
-  { sec: "Functional", item: "71. USB/HMDI/IO port functional", cp: "Detect device; pass signal; mech sound." },
-  { sec: "Functional", item: "72. TV tunner workable", cp: "Tuner scans & plays OK." },
-  { sec: "Functional", item: "73. ALS test auto brightness", cp: "Auto brightness reacts when covering sensor." },
-  { sec: "Functional", item: "74. Ensure Wifi MAC Address is 'Roku Inc'", cp: "Wi-Fi MAC OUI=Roku Inc; unique; 2.4/5G ok." },
-  { sec: "Functional", item: "75. Ensure Ethernet MAC Address is 'Roku Inc'", cp: "LAN link; OUI Roku; traffic stable." },
-  { sec: "Functional", item: "76. Ensure Bluetooth MAC Address is 'Roku Inc'", cp: "BT MAC OUI Roku; unique." },
-  { sec: "Functional", item: "77. Software update to latest Rev. (Customer Mode)", cp: "Updates & reboots to home w/o error." },
-  { sec: "Functional", item: "78. Confirm correct default locale (Region)", cp: "Region/locale matches market." },
-  { sec: "Functional", item: "79. IR LED color and finish", cp: "IR lens tint & emission OK." },
-  { sec: "Functional", item: "80. Speaker Grill (also cosmetic, but functional relevance)", cp: "No rattle/muffling; perforations clean." },
-  { sec: "Packaging and Carton (CA Products)", item: "81. Carton bilingual text (English/French)", cp: "All printed text bilingual per Canadian Act." },
-  { sec: "Packaging and Carton (CA Products)", item: "82. Country of Origin labeling", cp: "Made in ___ / Fabriqué en ___ both languages." },
-  { sec: "Packaging and Carton (CA Products)", item: "83. Shipping marks bilingual", cp: "Fragile / Ce côté vers le haut, etc. present." },
-  { sec: "Packaging and Carton (CA Products)", item: "84. Recycling symbols (Canada)", cp: "Bilingual message; provincial logos if req." },
-  { sec: "Packaging and Carton (CA Products)", item: "85. QSG & warranty bilingual content", cp: "Bilingual QSG + warranty leaflet included." },
-  { sec: "Packaging and Carton (CA Products)", item: "86. Remote label and packaging bilingual", cp: "Remote/batteries warnings bilingual." },
-  { sec: "Packaging and Carton (CA Products)", item: "87. Safety leaflet bilingual", cp: "Safety info bilingual; CDN contact info." },
-  { sec: "Labeling & Regulatory Checks (CA Products)", item: "88. Bilingual warning labels", cp: "Rear/PSU/user areas bilingual (CSA C22.2)." },
-  { sec: "Labeling & Regulatory Checks (CA Products)", item: "89. ESN Label (bilingual + typo check)", cp: "Matches on-screen; scans OK; avoid 'Mode/Modèle l'." },
-  { sec: "Labeling & Regulatory Checks (CA Products)", item: "90. CSA/ULc certification mark", cp: "CSA or cULus on nameplate; not UL-only." },
-  { sec: "Labeling & Regulatory Checks (CA Products)", item: "91. Industry Canada (ISED) ID labeling", cp: "ISED ID printed & legible; matches docs." },
-  { sec: "Labeling & Regulatory Checks (CA Products)", item: "92. FCC/IC dual compliance label", cp: "Combined FCC + IC statement present." },
-  { sec: "Labeling & Regulatory Checks (CA Products)", item: "93. Electrical rating label (CSA format)", cp: "Bilingual V/A/Hz text e.g., 120 V~ 60 Hz." },
-  { sec: "Labeling & Regulatory Checks (CA Products)", item: "94. Serial & MAC label bilingual phrasing", cp: "Serial Number / Numéro de série; MAC/Adresse." },
-  { sec: "Labeling & Regulatory Checks (CA Products)", item: "95. Legal manufacturer & importer address", cp: "Canadian importer/rep name & address present." },
-  { sec: "Functional (CA Products)", item: "96. Language selection (English/French)", cp: "Bilingual setup at first boot & system." },
-  { sec: "Functional (CA Products)", item: "97. Roku UI translation validation", cp: "Core UI strings correct in fr-CA." },
-  { sec: "Functional (CA Products)", item: "98. Time zone and region/locale setting (Canada)", cp: "Default region Canada; tz auto-detect OK." },
-  { sec: "Functional (CA Products)", item: "99. Streaming app compliance", cp: "CBC/Crave/Global TV present; US-only not preloaded." },
+  {
+    sec: "Packaging and Carton",
+    item: "1. Gift box Cosmetic inspection",
+    cp: "Check for dents, scratches, smudges, or misprinted artwork on the gift box.",
+  },
+  {
+    sec: "Packaging and Carton",
+    item: "2. Gift box pantone color check",
+    cp: "Verify carton color matches Pantone master standard (DeltaE <= 1.0).",
+  },
+  {
+    sec: "Packaging and Carton",
+    item: "3. Gift box label and QR code reading",
+    cp: "Ensure labels and QR codes are legible, properly placed, and scannable.",
+  },
+  {
+    sec: "Packaging and Carton",
+    item: "4. Gift box artwork match with drawing",
+    cp: "Artwork matches latest approved drawing and revision.",
+  },
+  {
+    sec: "Packaging and Carton",
+    item: "5. Gift box sealing tape well sealed",
+    cp: "Verify tape fully sealed, straight, and not overlapping print areas.",
+  },
+  {
+    sec: "Packaging and Carton",
+    item: "6. Pack doc is well placed on top foam",
+    cp: "Packing document placed per spec and visible when unboxing.",
+  },
+  {
+    sec: "Packaging and Carton",
+    item: "7. Straps tight, right location",
+    cp: "Straps tight; correct location; no twisting or missing straps.",
+  },
+  {
+    sec: "Packaging and Carton",
+    item: "8. Feet bags in place and in good condition",
+    cp: "Feet bags in correct location; no tears or missing components.",
+  },
+  {
+    sec: "Packaging and Carton",
+    item: "9. Internal straps",
+    cp: "Straps tight; correct location; no twisting or missing straps.",
+  },
+  {
+    sec: "Packaging and Carton",
+    item: "10. Hexcomb cardboard is installed",
+    cp: "Hexcomb installed securely; no gaps/deformation.",
+  },
+  {
+    sec: "Packaging and Carton",
+    item: "11. Internal Bag Supports TV unboxing",
+    cp: "Internal bag supports placed and intact; no tears.",
+  },
+  {
+    sec: "Packaging and Carton",
+    item: "12. Protective cardboard is installed",
+    cp: "Protective cardboard installed; no missing pieces.",
+  },
+  {
+    sec: "Packaging and Carton",
+    item: "13. Styrofoam inserts no missing /damage (EPS)",
+    cp: "EPS inserts present, undamaged, correct orientation.",
+  },
+  {
+    sec: "Packaging and Carton",
+    item: "14. TV bag well taped/folded down",
+    cp: "TV bag folded neatly and taped down securely.",
+  },
+  {
+    sec: "Packaging and Carton",
+    item: "15. correct Belly band P/N and color consistent",
+    cp: "Belly band P/N and color match the approved spec.",
+  },
+  {
+    sec: "Packaging and Carton",
+    item: "16. Correct pack document assembly order",
+    cp: "Verify appearance, placement, and conformity to drawing/specification.",
+  },
+  {
+    sec: "Packaging and Carton",
+    item: "17. correct envelop P/N and color",
+    cp: "Envelope color and part number per spec.",
+  },
+  {
+    sec: "Packaging and Carton",
+    item: "18. correct QSG part number and artwork",
+    cp: "Artwork matches latest approved drawing and revision.",
+  },
+  {
+    sec: "Packaging and Carton",
+    item: "19. QSG Folding and Placement",
+    cp: "QSG folded per spec; fits flat; orientation per master; no wrinkles/tears.",
+  },
+  {
+    sec: "Packaging and Carton",
+    item: "20. QSG Content Verification",
+    cp: "Approved rev; correct language/model/content; no outdated info.",
+  },
+  {
+    sec: "Packaging and Carton",
+    item: "21. PIF part number and artwork",
+    cp: "Artwork matches latest approved drawing and revision.",
+  },
+  {
+    sec: "Packaging and Carton",
+    item: "22. Audio inserts P/N and artwork",
+    cp: "Artwork matches latest approved drawing and revision.",
+  },
+  {
+    sec: "Packaging and Carton",
+    item: "23. I love Roku sticker good quality",
+    cp: "Printed cleanly; no fading or peeling.",
+  },
+  {
+    sec: "Accessories",
+    item: "24. Accessories bag/box no damage",
+    cp: "Accessory box complete and undamaged.",
+  },
+  {
+    sec: "Accessories",
+    item: "25. use correct remotes",
+    cp: "Confirm correct remote model included and functions.",
+  },
+  {
+    sec: "Accessories",
+    item: "26. use correct screws",
+    cp: "Ensure correct screw type, length, and quantity used.",
+  },
+  {
+    sec: "Accessories",
+    item: "27. clamp, USB, power cable good quality",
+    cp: "Plug USB; device detected within 3s; files readable; no port looseness.",
+  },
+  {
+    sec: "Labeling & Regulatory Checks",
+    item: "28. Serial/Model Label Placement",
+    cp: "Correct SKU/SN/model; within window; strong adhesion (peel test).",
+  },
+  {
+    sec: "Labeling & Regulatory Checks",
+    item: "29. ESN Label",
+    cp: "Back-cover ESN matches on-screen; barcode scans; no print errors.",
+  },
+  {
+    sec: "Labeling & Regulatory Checks",
+    item: "30. Barcode Scannability",
+    cp: "All barcodes (SN/MAC/carton) scan first pass.",
+  },
+  {
+    sec: "Labeling & Regulatory Checks",
+    item: "31. Regulatory/EMI Labels",
+    cp: "Correct regional marks (FCC/UL/NOM/DOE/ENERGY STAR, etc.).",
+  },
+  {
+    sec: "Labeling & Regulatory Checks",
+    item: "32. Energy Label (DOE/FTC/NOM-032)",
+    cp: "Rev/design match art; placed correctly; not obstructed.",
+  },
+  {
+    sec: "Labeling & Regulatory Checks",
+    item: "33. Warning/Caution Labels",
+    cp: "Required warnings present, legible, correctly located.",
+  },
+  {
+    sec: "Labeling & Regulatory Checks",
+    item: "34. Back Cover Film & Brand",
+    cp: "Correct logo, surface film, alignment.",
+  },
+  {
+    sec: "Labeling & Regulatory Checks",
+    item: "35. I/O port and label quality",
+    cp: "Port labels printed clearly; match drawing.",
+  },
+  {
+    sec: "Labeling & Regulatory Checks",
+    item: "36. Labels, energy and rating label",
+    cp: "Placement & legibility; matches gift box & spec.",
+  },
+  {
+    sec: "Labeling & Regulatory Checks",
+    item: "37. Device label and QR code",
+    cp: "SN/MAC/SKU consistent with carton; scannable.",
+  },
+  {
+    sec: "Labeling & Regulatory Checks",
+    item: "38. Laser backplate artwork",
+    cp: "Artwork revision & cosmetic quality per drawing.",
+  },
+  {
+    sec: "Labeling & Regulatory Checks",
+    item: "39. Logo no damage, scratch, discoloration",
+    cp: "Correct color, adhesion, alignment.",
+  },
+  {
+    sec: "Labeling & Regulatory Checks",
+    item: "40. Regulatory Label Compliant (Back of TV)",
+    cp: "FCC/UL/NOM/DOE compliance; placement & durability.",
+  },
+  {
+    sec: "Mechanical",
+    item: "41. Stand good quality (heat sealed)",
+    cp: "Stand strength, weld quality, heat seal integrity.",
+  },
+  {
+    sec: "Mechanical",
+    item: "42. Feet CMF",
+    cp: "Surface finish, color, texture per BOM.",
+  },
+  {
+    sec: "Mechanical",
+    item: "43. Feet slide into slots correctly",
+    cp: "Proper fit; alignment & engagement.",
+  },
+  {
+    sec: "Mechanical",
+    item: "44. Thumbscrews engage smoothly and tighten securely",
+    cp: "Correct thread; no cross-thread/strip.",
+  },
+  {
+    sec: "Mechanical",
+    item: "45. Positioning Guide Installed correctly",
+    cp: "Fit & placement; no interference.",
+  },
+  {
+    sec: "Mechanical",
+    item: "46. Screen/Panel no quality issues",
+    cp: "Flatness; secure mount; no cracks/pressure.",
+  },
+  {
+    sec: "Mechanical",
+    item: "47. Open Cell tape correctly placed",
+    cp: "Adhesion/positioning; no air/wrinkles.",
+  },
+  {
+    sec: "Mechanical",
+    item: "48. Protective film on bezels well taped",
+    cp: "Good adhesion & coverage; tab accessible.",
+  },
+  {
+    sec: "Mechanical",
+    item: "49. Bezel texture and color",
+    cp: "Match golden sample & tooling rev.",
+  },
+  {
+    sec: "Mechanical",
+    item: "50. DECO Bezel",
+    cp: "Decorative bezel surface, gloss, attachment.",
+  },
+  {
+    sec: "Mechanical",
+    item: "51. Back cover good quality",
+    cp: "Material integrity; warpage; screw/clip engagement.",
+  },
+  {
+    sec: "Mechanical",
+    item: "52. Velcro straps attached to back cover",
+    cp: "Strength and proper routing.",
+  },
+  {
+    sec: "Mechanical",
+    item: "53. Speaker grill no physical damage",
+    cp: "Alignment/integrity; no gaps/deformation.",
+  },
+  {
+    sec: "Mechanical",
+    item: "54. Power socket good quality",
+    cp: "Secure retention; alignment; electrical fit.",
+  },
+  {
+    sec: "Mechanical",
+    item: "55. All TV screws without damage",
+    cp: "Correct torque; no stripped/loose screws.",
+  },
+  {
+    sec: "Mechanical",
+    item: "56. Install feet same size screws for foot fit check",
+    cp: "Correct screw type/torque; fixture alignment.",
+  },
+  {
+    sec: "Mechanical",
+    item: "57. Overall TV Dimensions (Width x Height x Depth)",
+    cp: "Verify overall assembly vs. box reference.",
+  },
+  {
+    sec: "Functional",
+    item: "58. Boots to App Image",
+    cp: "Boot to Roku home ≤5s; logo/animation OK.",
+  },
+  {
+    sec: "Functional",
+    item: "59. Correct Brand UI",
+    cp: "Correct skin; layout/colors/icons match build.",
+  },
+  {
+    sec: "Functional",
+    item: "60. Remote control works (IR/ RF)",
+    cp: "IR+BLE pairing; all keys respond.",
+  },
+  {
+    sec: "Functional",
+    item: "61. Follow OOBA steps to connect WIFI and test",
+    cp: "2.4G/5G connect OK; update prompt if any.",
+  },
+  {
+    sec: "Functional",
+    item: "62. check software version",
+    cp: "Build number vs release plan/golden sample.",
+  },
+  {
+    sec: "Functional",
+    item: "63. Guided Setup Completes",
+    cp: "End-to-end OK; no crash/reboot.",
+  },
+  {
+    sec: "Functional",
+    item: "64. Factory Reset using Reset button",
+    cp: "Hold 10s; boots to OOBE.",
+  },
+  {
+    sec: "Functional",
+    item: "65. adjusting volume to check sound no quality issues",
+    cp: "Sound clean; no artifacts; mapping OK.",
+  },
+  {
+    sec: "Functional",
+    item: "66. power on/off no image, sound quality issues",
+    cp: "Cycles smoothly; no flicker/relay click.",
+  },
+  {
+    sec: "Functional",
+    item: "67. No PSU AC noise issue during power on/standby",
+    cp: "No coil whine/buzz on power/standby.",
+  },
+  {
+    sec: "Functional",
+    item: "68. No light leakage at dark screen, no shiny spot, bad pixel",
+    cp: "Dark-room: no edge/back leaks; no bright spots/mura.",
+  },
+  {
+    sec: "Functional",
+    item: "69. No Light leakage thru back cover gaps",
+    cp: "Dark-room: no light through back-cover gaps.",
+  },
+  {
+    sec: "Functional",
+    item: "70. adjusting brightness, contrast no display quality issues",
+    cp: "Adjustments apply w/o flicker/instability.",
+  },
+  {
+    sec: "Functional",
+    item: "71. USB/HMDI/IO port functional",
+    cp: "Detect device; pass signal; mech sound.",
+  },
+  {
+    sec: "Functional",
+    item: "72. TV tunner workable",
+    cp: "Tuner scans & plays OK.",
+  },
+  {
+    sec: "Functional",
+    item: "73. ALS test auto brightness",
+    cp: "Auto brightness reacts when covering sensor.",
+  },
+  {
+    sec: "Functional",
+    item: "74. Ensure Wifi MAC Address is 'Roku Inc'",
+    cp: "Wi-Fi MAC OUI=Roku Inc; unique; 2.4/5G ok.",
+  },
+  {
+    sec: "Functional",
+    item: "75. Ensure Ethernet MAC Address is 'Roku Inc'",
+    cp: "LAN link; OUI Roku; traffic stable.",
+  },
+  {
+    sec: "Functional",
+    item: "76. Ensure Bluetooth MAC Address is 'Roku Inc'",
+    cp: "BT MAC OUI Roku; unique.",
+  },
+  {
+    sec: "Functional",
+    item: "77. Software update to latest Rev. (Customer Mode)",
+    cp: "Updates & reboots to home w/o error.",
+  },
+  {
+    sec: "Functional",
+    item: "78. Confirm correct default locale (Region)",
+    cp: "Region/locale matches market.",
+  },
+  {
+    sec: "Functional",
+    item: "79. IR LED color and finish",
+    cp: "IR lens tint & emission OK.",
+  },
+  {
+    sec: "Functional",
+    item: "80. Speaker Grill (also cosmetic, but functional relevance)",
+    cp: "No rattle/muffling; perforations clean.",
+  },
+  {
+    sec: "Packaging and Carton (CA Products)",
+    item: "81. Carton bilingual text (English/French)",
+    cp: "All printed text bilingual per Canadian Act.",
+  },
+  {
+    sec: "Packaging and Carton (CA Products)",
+    item: "82. Country of Origin labeling",
+    cp: "Made in ___ / Fabriqué en ___ both languages.",
+  },
+  {
+    sec: "Packaging and Carton (CA Products)",
+    item: "83. Shipping marks bilingual",
+    cp: "Fragile / Ce côté vers le haut, etc. present.",
+  },
+  {
+    sec: "Packaging and Carton (CA Products)",
+    item: "84. Recycling symbols (Canada)",
+    cp: "Bilingual message; provincial logos if req.",
+  },
+  {
+    sec: "Packaging and Carton (CA Products)",
+    item: "85. QSG & warranty bilingual content",
+    cp: "Bilingual QSG + warranty leaflet included.",
+  },
+  {
+    sec: "Packaging and Carton (CA Products)",
+    item: "86. Remote label and packaging bilingual",
+    cp: "Remote/batteries warnings bilingual.",
+  },
+  {
+    sec: "Packaging and Carton (CA Products)",
+    item: "87. Safety leaflet bilingual",
+    cp: "Safety info bilingual; CDN contact info.",
+  },
+  {
+    sec: "Labeling & Regulatory Checks (CA Products)",
+    item: "88. Bilingual warning labels",
+    cp: "Rear/PSU/user areas bilingual (CSA C22.2).",
+  },
+  {
+    sec: "Labeling & Regulatory Checks (CA Products)",
+    item: "89. ESN Label (bilingual + typo check)",
+    cp: "Matches on-screen; scans OK; avoid 'Mode/Modèle l'.",
+  },
+  {
+    sec: "Labeling & Regulatory Checks (CA Products)",
+    item: "90. CSA/ULc certification mark",
+    cp: "CSA or cULus on nameplate; not UL-only.",
+  },
+  {
+    sec: "Labeling & Regulatory Checks (CA Products)",
+    item: "91. Industry Canada (ISED) ID labeling",
+    cp: "ISED ID printed & legible; matches docs.",
+  },
+  {
+    sec: "Labeling & Regulatory Checks (CA Products)",
+    item: "92. FCC/IC dual compliance label",
+    cp: "Combined FCC + IC statement present.",
+  },
+  {
+    sec: "Labeling & Regulatory Checks (CA Products)",
+    item: "93. Electrical rating label (CSA format)",
+    cp: "Bilingual V/A/Hz text e.g., 120 V~ 60 Hz.",
+  },
+  {
+    sec: "Labeling & Regulatory Checks (CA Products)",
+    item: "94. Serial & MAC label bilingual phrasing",
+    cp: "Serial Number / Numéro de série; MAC/Adresse.",
+  },
+  {
+    sec: "Labeling & Regulatory Checks (CA Products)",
+    item: "95. Legal manufacturer & importer address",
+    cp: "Canadian importer/rep name & address present.",
+  },
+  {
+    sec: "Functional (CA Products)",
+    item: "96. Language selection (English/French)",
+    cp: "Bilingual setup at first boot & system.",
+  },
+  {
+    sec: "Functional (CA Products)",
+    item: "97. Roku UI translation validation",
+    cp: "Core UI strings correct in fr-CA.",
+  },
+  {
+    sec: "Functional (CA Products)",
+    item: "98. Time zone and region/locale setting (Canada)",
+    cp: "Default region Canada; tz auto-detect OK.",
+  },
+  {
+    sec: "Functional (CA Products)",
+    item: "99. Streaming app compliance",
+    cp: "CBC/Crave/Global TV present; US-only not preloaded.",
+  },
 ];
+
+/* ---------------- image helper for PDF ---------------- */
+function imageToDataUrl(url: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const maxWidth = 360;
+      const scale = Math.min(1, maxWidth / img.width);
+      canvas.width = img.width * scale;
+      canvas.height = img.height * scale;
+
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("No canvas context"));
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+      resolve(dataUrl);
+    };
+
+    img.onerror = () => reject(new Error("Failed to load image"));
+    img.src = url;
+  });
+}
 
 /* ================== MAIN APP ================== */
 export default function App() {
@@ -301,31 +724,25 @@ export default function App() {
     if (!files) return;
     const list: Photo[] = [];
     Array.from(files).forEach((f) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        list.push({
-          id: Date.now() + Math.random(),
-          dataUrl: String(reader.result),
-          caption: "",
-        });
-        // push after file is loaded
-        setPhotos((p) => [...p, ...list]);
-      };
-      reader.readAsDataURL(f);
+      const url = URL.createObjectURL(f);
+      list.push({ id: Date.now() + Math.random(), url, caption: "" });
     });
+    setPhotos((p) => [...p, ...list]);
   }
 
   function removePhoto(id: number) {
     setPhotos((p) => p.filter((x) => x.id !== id));
   }
 
-  
   const visibleRows = useMemo<Row[]>(() => {
     const isCA = market === "CA";
-    return allRows.filter((r) => (isCA ? true : !r.sec.includes("(CA Products)")));
+    return allRows.filter((r) =>
+      isCA ? true : !r.sec.includes("(CA Products)")
+    );
   }, [allRows, market]);
 
   const oc = useMemo(() => overallCounts(visibleRows), [visibleRows]);
+
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const sections = useMemo(() => {
@@ -353,13 +770,17 @@ export default function App() {
   const expandAll = () => setCollapsed({});
 
   const setSectionRes = (sec: string, val: string) =>
-    setAllRows((prev) => prev.map((r) => (r.sec === sec ? { ...r, res: val } : r)));
+    setAllRows((prev) =>
+      prev.map((r) => (r.sec === sec ? { ...r, res: val } : r))
+    );
 
   const clearSectionRes = (sec: string) =>
-    setAllRows((prev) => prev.map((r) => (r.sec === sec ? { ...r, res: "" } : r)));
+    setAllRows((prev) =>
+      prev.map((r) => (r.sec === sec ? { ...r, res: "" } : r))
+    );
 
   /* ---------------- PDF Export (CDN-safe) ---------------- */
-  function exportPDF() {
+  async function exportPDF() {
     const ctor = (window as any).jspdf?.jsPDF;
     if (!ctor) {
       alert(
@@ -374,57 +795,32 @@ export default function App() {
       format: "a4",
     });
 
-    const failRows = visibleRows.filter((r) => r.res === "FAIL");
-
-    doc.setFontSize(16);
+    // Title
+    doc.setFontSize(14);
     doc.setTextColor(76, 29, 149);
-    doc.text("Roku FAI Report", 40, 32);
+    doc.text("Roku FAI Report", 14, 20);
 
+    // Meta line
     doc.setFontSize(10);
     doc.setTextColor(60, 60, 60);
     doc.text(
-      `Model: ${model || "-"}  |  Serial: ${serial || "-"}  |  Mfg: ${
+      `Model: ${model || "-"} | Serial: ${serial || "-"} | Mfg: ${
         mfg || "-"
-      }  |  Insp: ${insp || "-"}  |  Size: ${size}  |  Market: ${market}`,
-      40,
+      } | Insp: ${insp || "-"} | Size: ${size} | Market: ${
+        market || "-"
+      } | Overall: ${overall || "-"}`,
+      14,
+      34
+    );
+
+    // Overall stats
+    doc.text(
+      `Summary – Pass: ${oc.pass}  | Fail: ${oc.fail}  | N/A: ${oc.na}  | Open: ${oc.open}  | Pass %: ${oc.pct}%`,
+      14,
       48
     );
 
-    doc.setFontSize(11);
-    doc.setTextColor(34, 197, 94); // green
-    doc.text(`FAI Overall Result: ${overall || "-"}`, 40, 64);
-
-    doc.setFontSize(9);
-    doc.setTextColor(55, 65, 81);
-    doc.text(
-      `Pass: ${oc.pass}    Fail: ${oc.fail}    N/A: ${oc.na}    Open: ${oc.open}    Pass %: ${oc.pct}%`,
-      40,
-      80
-    );
-
-    let summaryY = 96;
-    if (failRows.length > 0) {
-      doc.setTextColor(220, 38, 38);
-      doc.text("Failed items:", 40, summaryY);
-      summaryY += 14;
-      doc.setTextColor(55, 65, 81);
-      failRows.slice(0, 20).forEach((r) => {
-        const line = `• [${r.sec}] ${r.item}`;
-        doc.text(line, 50, summaryY);
-        summaryY += 12;
-      });
-      if (failRows.length > 20) {
-        doc.text(
-          `...and ${failRows.length - 20} more.`,
-          50,
-          summaryY + 4
-        );
-      }
-    } else {
-      doc.setTextColor(22, 163, 74);
-      doc.text("No failed items recorded in this FAI.", 40, summaryY);
-    }
-
+    // Table
     const tableRows = visibleRows.map((r) => [
       r.sec,
       r.item,
@@ -437,19 +833,59 @@ export default function App() {
     (doc as any).autoTable({
       head: [["Category", "Item", "Checkpoint", "Result", "JIRA", "Notes"]],
       body: tableRows,
-      startY: summaryY + 20,
+      startY: 60,
       styles: { fontSize: 7 },
       headStyles: { fillColor: [76, 29, 149], textColor: [255, 255, 255] },
       alternateRowStyles: { fillColor: [245, 243, 255] },
     });
 
-    const fn = `FAI_${sanitizeName(model)}_${sanitizeName(
-      serial
-    )}_${sanitizeName(size)}_${sanitizeName(market)}_${new Date()
-      .toISOString()
-      .slice(0, 10)}.pdf`;
+    // Photos appended after table
+    if (photos.length > 0) {
+      const anyDoc: any = doc;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const marginX = 40;
+      const initialY = (anyDoc.lastAutoTable?.finalY ?? 60) + 30;
+      let y = initialY;
 
-    doc.save(fn);
+      const dataUrls = await Promise.all(
+        photos.map((p) =>
+          imageToDataUrl(p.url).catch(() => {
+            console.warn("Could not convert photo to data URL", p.url);
+            return "";
+          })
+        )
+      );
+
+      const imgWidth = pageWidth - marginX * 2;
+      const imgHeight = imgWidth * 0.56; // ~16:9
+
+      dataUrls.forEach((dataUrl, idx) => {
+        if (!dataUrl) return;
+
+        if (y + imgHeight + 40 > pageHeight) {
+          doc.addPage();
+          y = 40;
+        }
+
+        doc.addImage(dataUrl, "JPEG", marginX, y, imgWidth, imgHeight);
+
+        const caption = photos[idx].caption || `Photo ${idx + 1}`;
+        doc.setFontSize(9);
+        doc.setTextColor(60, 60, 60);
+        doc.text(caption, marginX, y + imgHeight + 12);
+
+        y += imgHeight + 40;
+      });
+    }
+
+    doc.save(
+      `FAI_${sanitizeName(model)}_${sanitizeName(serial)}_${sanitizeName(
+        size
+      )}_${sanitizeName(market)}_${new Date()
+        .toISOString()
+        .slice(0, 10)}.pdf`
+    );
   }
 
   /* ---------------- Add new item ---------------- */
@@ -458,8 +894,10 @@ export default function App() {
   const [newCp, setNewCp] = useState("");
 
   function addNewRow() {
-    if (!newItem.trim() || !newCp.trim())
-      return alert("Please fill item & checkpoint");
+    if (!newItem.trim() || !newCp.trim()) {
+      alert("Please fill item & checkpoint");
+      return;
+    }
     const newRow: Row = {
       id: allRows.length + 1,
       sec: newSec,
@@ -596,24 +1034,24 @@ export default function App() {
         </div>
       </div>
 
-      {/* Global controls above checklist */}
+      {/* Global collapse / expand + export buttons */}
       <div
         style={{
           display: "flex",
+          flexWrap: "wrap",
           gap: "8px",
-          marginTop: "8px",
-          marginBottom: "4px",
-          justifyContent: "flex-end",
+          marginTop: "10px",
+          alignItems: "center",
         }}
       >
         <button
-          style={{ ...CELL, padding: "6px 10px", maxWidth: 130, cursor: "pointer" }}
+          style={{ ...CELL, padding: "8px 12px", width: "auto" }}
           onClick={collapseAll}
         >
           Collapse all
         </button>
         <button
-          style={{ ...CELL, padding: "6px 10px", maxWidth: 130, cursor: "pointer" }}
+          style={{ ...CELL, padding: "8px 12px", width: "auto" }}
           onClick={expandAll}
         >
           Expand all
@@ -621,11 +1059,11 @@ export default function App() {
         <button
           style={{
             ...CELL,
-            padding: "6px 10px",
-            maxWidth: 140,
-            cursor: "pointer",
+            padding: "8px 12px",
+            width: "auto",
             background: "#f3e8ff",
             color: "#4c1d95",
+            cursor: "pointer",
           }}
           onClick={exportPDF}
         >
@@ -638,7 +1076,7 @@ export default function App() {
         style={{
           border: "1px solid #e5e7eb",
           borderRadius: "10px",
-          marginTop: "4px",
+          marginTop: "8px",
           maxHeight: "70vh",
           overflowY: "auto",
           overflowX: "auto",
@@ -695,7 +1133,14 @@ export default function App() {
                   {collapsed[section.sec] ? "▶" : "▼"} {section.sec}
                 </button>
 
-                <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: "6px",
+                    alignItems: "center",
+                    flexWrap: "wrap",
+                  }}
+                >
                   <div style={BADGE}>All {c.total}</div>
                   <div
                     style={{ ...BADGE, background: "#ecfdf5", color: "#065f46" }}
@@ -714,25 +1159,45 @@ export default function App() {
                   </div>
                   <button
                     onClick={() => setSectionRes(section.sec, "PASS")}
-                    style={{ ...CELL, padding: "4px 8px", cursor: "pointer" }}
+                    style={{
+                      ...CELL,
+                      padding: "4px 8px",
+                      cursor: "pointer",
+                      width: "auto",
+                    }}
                   >
                     All PASS
                   </button>
                   <button
                     onClick={() => setSectionRes(section.sec, "FAIL")}
-                    style={{ ...CELL, padding: "4px 8px", cursor: "pointer" }}
+                    style={{
+                      ...CELL,
+                      padding: "4px 8px",
+                      cursor: "pointer",
+                      width: "auto",
+                    }}
                   >
                     All FAIL
                   </button>
                   <button
                     onClick={() => setSectionRes(section.sec, "N/A")}
-                    style={{ ...CELL, padding: "4px 8px", cursor: "pointer" }}
+                    style={{
+                      ...CELL,
+                      padding: "4px 8px",
+                      cursor: "pointer",
+                      width: "auto",
+                    }}
                   >
                     All N/A
                   </button>
                   <button
                     onClick={() => clearSectionRes(section.sec)}
-                    style={{ ...CELL, padding: "4px 8px", cursor: "pointer" }}
+                    style={{
+                      ...CELL,
+                      padding: "4px 8px",
+                      cursor: "pointer",
+                      width: "auto",
+                    }}
                   >
                     Clear
                   </button>
@@ -771,8 +1236,8 @@ export default function App() {
                       style={{
                         ...CELL,
                         resize: "vertical",
-                        minHeight: 48,
-                        whiteSpace: "pre-wrap",
+                        minHeight: "48px",
+                        lineHeight: 1.35,
                       }}
                       value={r.cp}
                       onChange={(e) =>
@@ -804,8 +1269,7 @@ export default function App() {
                       style={{
                         ...CELL,
                         resize: "vertical",
-                        minHeight: 40,
-                        whiteSpace: "pre-wrap",
+                        minHeight: "40px",
                       }}
                       value={r.jira || ""}
                       onChange={(e) =>
@@ -820,8 +1284,7 @@ export default function App() {
                       style={{
                         ...CELL,
                         resize: "vertical",
-                        minHeight: 40,
-                        whiteSpace: "pre-wrap",
+                        minHeight: "40px",
                       }}
                       value={r.note || ""}
                       onChange={(e) =>
@@ -913,9 +1376,8 @@ export default function App() {
               style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}
             >
               <img
-                src={p.dataUrl}
-                style={{ width: "100%", borderRadius: 6 }}
-                alt="FAI"
+                src={p.url}
+                style={{ width: "100%", borderRadius: 6, marginBottom: 6 }}
               />
               <input
                 style={{ ...CELL, marginTop: 6 }}
