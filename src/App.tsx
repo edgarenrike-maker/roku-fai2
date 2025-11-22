@@ -32,10 +32,12 @@ function ensurePWASetup() {
 
 /* ------------------ helpers ------------------ */
 
+
 function sanitizeName(x: string) {
   return (x || "").replace(/[^a-z0-9_-]+/gi, "").slice(0, 40) || "NA";
 }
 
+/* ------------------ types ------------------ */
 type Row = {
   id: number;
   sec: string;
@@ -54,6 +56,8 @@ type Photo = {
   caption: string;
 };
 
+/* ------------------ constants ------------------ */
+
 const TV_SIZES = [
   "24in",
   "32in",
@@ -67,7 +71,6 @@ const TV_SIZES = [
   "85in",
 ];
 const MARKETS = ["US", "CA", "MX"];
-
 const SECTIONS = [
   "Packaging and Carton",
   "Accessories",
@@ -79,10 +82,10 @@ const SECTIONS = [
   "Functional (CA Products)",
 ];
 
-const COLS = "1.6fr 2.6fr 5fr 1.1fr 1.4fr 1.6fr";
+const COLS = "1.6fr 2.6fr 5fr 1fr 1.3fr 2fr";
 
 const CELL: React.CSSProperties = {
-  padding: "6px 8px",
+  padding: "6px",
   border: "1px solid #e5e7eb",
   borderRadius: "8px",
   width: "100%",
@@ -167,6 +170,7 @@ function overallCounts(rows: Row[]) {
 }
 
 /* --------------------------- checklist (99) --------------------------- */
+
 const FULL_CHECKLIST: RowSeed[] = [
   {
     sec: "Packaging and Carton",
@@ -665,36 +669,8 @@ const FULL_CHECKLIST: RowSeed[] = [
   },
 ];
 
-/* ---------------- image helper for PDF ---------------- */
-function imageToDataUrl(url: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      const maxWidth = 360;
-      const scale = Math.min(1, maxWidth / img.width);
-      canvas.width = img.width * scale;
-      canvas.height = img.height * scale;
-
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        reject(new Error("No canvas context"));
-        return;
-      }
-
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
-      resolve(dataUrl);
-    };
-
-    img.onerror = () => reject(new Error("Failed to load image"));
-    img.src = url;
-  });
-}
-
 /* ================== MAIN APP ================== */
+
 export default function App() {
   useEffect(() => {
     ensurePWASetup();
@@ -719,7 +695,6 @@ export default function App() {
   );
 
   const [photos, setPhotos] = useState<Photo[]>([]);
-
   function addPhotos(files: FileList | null) {
     if (!files) return;
     const list: Photo[] = [];
@@ -729,20 +704,18 @@ export default function App() {
     });
     setPhotos((p) => [...p, ...list]);
   }
-
   function removePhoto(id: number) {
     setPhotos((p) => p.filter((x) => x.id !== id));
   }
 
+  const meta = { model, serial, mfg, insp, overall };
+
   const visibleRows = useMemo<Row[]>(() => {
     const isCA = market === "CA";
-    return allRows.filter((r) =>
-      isCA ? true : !r.sec.includes("(CA Products)")
-    );
+    return allRows.filter((r) => (isCA ? true : !r.sec.includes("(CA Products)")));
   }, [allRows, market]);
 
   const oc = useMemo(() => overallCounts(visibleRows), [visibleRows]);
-
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
   const sections = useMemo(() => {
@@ -760,65 +733,64 @@ export default function App() {
 
   const toggleSection = (sec: string) =>
     setCollapsed((p) => ({ ...p, [sec]: !p[sec] }));
-
   const collapseAll = () => {
     const m: Record<string, boolean> = {};
     sections.forEach((s) => (m[s.sec] = true));
     setCollapsed(m);
   };
-
   const expandAll = () => setCollapsed({});
 
   const setSectionRes = (sec: string, val: string) =>
-    setAllRows((prev) =>
-      prev.map((r) => (r.sec === sec ? { ...r, res: val } : r))
-    );
-
+    setAllRows((prev) => prev.map((r) => (r.sec === sec ? { ...r, res: val } : r)));
   const clearSectionRes = (sec: string) =>
-    setAllRows((prev) =>
-      prev.map((r) => (r.sec === sec ? { ...r, res: "" } : r))
-    );
+    setAllRows((prev) => prev.map((r) => (r.sec === sec ? { ...r, res: "" } : r)));
 
-  /* ---------------- PDF Export (CDN-safe) ---------------- */
-  async function exportPDF() {
+  /* ---------------- PDF Export ---------------- */
+
+  function exportPDF() {
     const ctor = (window as any).jspdf?.jsPDF;
     if (!ctor) {
-      alert(
-        "PDF engine not loaded. Check the two CDN <script> tags in index.html."
-      );
+      alert("PDF engine not loaded. Check the two CDN <script> tags in index.html.");
       return;
     }
+    const doc = new ctor({ orientation: "landscape", unit: "pt", format: "a4" });
 
-    const doc = new ctor({
-      orientation: "landscape",
-      unit: "pt",
-      format: "a4",
-    });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
 
     // Title
-    doc.setFontSize(14);
+    doc.setFontSize(16);
     doc.setTextColor(76, 29, 149);
-    doc.text("Roku FAI Report", 14, 20);
+    doc.text("Roku FAI Report", 40, 32);
 
     // Meta line
-    doc.setFontSize(10);
-    doc.setTextColor(60, 60, 60);
-    doc.text(
-      `Model: ${model || "-"} | Serial: ${serial || "-"} | Mfg: ${
-        mfg || "-"
-      } | Insp: ${insp || "-"} | Size: ${size} | Market: ${
-        market || "-"
-      } | Overall: ${overall || "-"}`,
-      14,
-      34
-    );
+    doc.setFontSize(9);
+    doc.setTextColor(55, 65, 81);
+    const metaLine = `Model: ${model || "-"} | Serial: ${
+      serial || "-"
+    } | Mfg: ${mfg || "-"} | Insp: ${insp || "-"} | Size: ${size} | Market: ${market}`;
+    doc.text(metaLine, 40, 48);
 
-    // Overall stats
-    doc.text(
-      `Summary – Pass: ${oc.pass}  | Fail: ${oc.fail}  | N/A: ${oc.na}  | Open: ${oc.open}  | Pass %: ${oc.pct}%`,
-      14,
-      48
-    );
+    // Overall + summary line
+    const counts = overallCounts(visibleRows);
+    doc.setFontSize(11);
+    doc.setTextColor(16, 83, 16);
+    doc.text(`FAI Overall Result: ${overall || "PASS"}`, 40, 64);
+
+    doc.setFontSize(9);
+    doc.setTextColor(55, 65, 81);
+    const summaryLine = `Pass: ${counts.pass}   Fail: ${counts.fail}   N/A: ${counts.na}   Open: ${counts.open}   Pass %: ${counts.pct}%`;
+    doc.text(summaryLine, 40, 80);
+
+    const failedItems = visibleRows.filter((r) => r.res === "FAIL");
+    doc.setFontSize(9);
+    if (!failedItems.length) {
+      doc.setTextColor(16, 83, 16);
+      doc.text("No failed items recorded in this FAI.", 40, 96);
+    } else {
+      doc.setTextColor(148, 27, 27);
+      doc.text("Failed items present in this FAI. See table and JIRA notes below.", 40, 96);
+    }
 
     // Table
     const tableRows = visibleRows.map((r) => [
@@ -833,71 +805,100 @@ export default function App() {
     (doc as any).autoTable({
       head: [["Category", "Item", "Checkpoint", "Result", "JIRA", "Notes"]],
       body: tableRows,
-      startY: 60,
+      startY: 110,
       styles: { fontSize: 7 },
       headStyles: { fillColor: [76, 29, 149], textColor: [255, 255, 255] },
       alternateRowStyles: { fillColor: [245, 243, 255] },
+      columnStyles: {
+        0: { cellWidth: 90 },
+        1: { cellWidth: 130 },
+        2: { cellWidth: 260 },
+        3: { cellWidth: 60 },
+        4: { cellWidth: 90 },
+        5: { cellWidth: 150 },
+      },
     });
 
-    // Photos appended after table
-    if (photos.length > 0) {
-      const anyDoc: any = doc;
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const marginX = 40;
-      const initialY = (anyDoc.lastAutoTable?.finalY ?? 60) + 30;
-      let y = initialY;
+    const lastY =
+      ((doc as any).lastAutoTable && (doc as any).lastAutoTable.finalY) || 110;
 
-      const dataUrls = await Promise.all(
-        photos.map((p) =>
-          imageToDataUrl(p.url).catch(() => {
-            console.warn("Could not convert photo to data URL", p.url);
-            return "";
-          })
-        )
-      );
+    // Photos grid (3 per row, multiple per page)
+    if (photos.length) {
+      const leftMargin = 40;
+      const topMarginFirstPage = lastY + 30;
+      const topMarginNewPage = 50;
+      const bottomMargin = 40;
 
-      const imgWidth = pageWidth - marginX * 2;
-      const imgHeight = imgWidth * 0.56; // ~16:9
+      const gapX = 12;
+      const gapY = 32;
+      const photosPerRow = 3;
 
-      dataUrls.forEach((dataUrl, idx) => {
-        if (!dataUrl) return;
+      const photoWidth =
+        (pageWidth - leftMargin * 2 - gapX * (photosPerRow - 1)) / photosPerRow;
+      const photoHeight = photoWidth * 0.6;
 
-        if (y + imgHeight + 40 > pageHeight) {
-          doc.addPage();
-          y = 40;
+      let y = topMarginFirstPage;
+
+      const drawHeading = (text: string) => {
+        doc.setFontSize(11);
+        doc.setTextColor(76, 29, 149);
+        doc.text(text, leftMargin, y);
+        y += 18;
+      };
+
+      drawHeading("Photos");
+
+      photos.forEach((p, index) => {
+        // New row?
+        if (index % photosPerRow === 0 && index !== 0) {
+          y += photoHeight + gapY;
         }
 
-        doc.addImage(dataUrl, "JPEG", marginX, y, imgWidth, imgHeight);
+        // New page?
+        if (y + photoHeight + 20 > pageHeight - bottomMargin) {
+          doc.addPage();
+          y = topMarginNewPage;
+          drawHeading("Photos (cont.)");
+        }
 
-        const caption = photos[idx].caption || `Photo ${idx + 1}`;
-        doc.setFontSize(9);
-        doc.setTextColor(60, 60, 60);
-        doc.text(caption, marginX, y + imgHeight + 12);
+        const colIndex = index % photosPerRow;
+        const x =
+          leftMargin + colIndex * (photoWidth + gapX);
 
-        y += imgHeight + 40;
+        try {
+          doc.addImage(p.url, "JPEG", x, y, photoWidth, photoHeight);
+        } catch {
+          // If addImage complains about format, just ignore this photo
+        }
+
+        if (p.caption) {
+          doc.setFontSize(8);
+          doc.setTextColor(55, 65, 81);
+          doc.text(p.caption, x, y + photoHeight + 10, {
+            maxWidth: photoWidth,
+          });
+        }
       });
     }
 
-    doc.save(
-      `FAI_${sanitizeName(model)}_${sanitizeName(serial)}_${sanitizeName(
-        size
-      )}_${sanitizeName(market)}_${new Date()
-        .toISOString()
-        .slice(0, 10)}.pdf`
-    );
+    const fn = `FAI_${sanitizeName(meta.model)}_${sanitizeName(
+      meta.serial
+    )}_${sanitizeName(size)}_${sanitizeName(market)}_${new Date()
+      .toISOString()
+      .slice(0, 10)}.pdf`;
+
+    doc.save(fn);
   }
 
   /* ---------------- Add new item ---------------- */
+
   const [newSec, setNewSec] = useState(SECTIONS[0]);
   const [newItem, setNewItem] = useState("");
   const [newCp, setNewCp] = useState("");
 
   function addNewRow() {
-    if (!newItem.trim() || !newCp.trim()) {
-      alert("Please fill item & checkpoint");
-      return;
-    }
+    if (!newItem.trim() || !newCp.trim())
+      return alert("Please fill item & checkpoint");
     const newRow: Row = {
       id: allRows.length + 1,
       sec: newSec,
@@ -914,6 +915,7 @@ export default function App() {
   }
 
   /* ---------------- Render UI ---------------- */
+
   return (
     <div
       style={{
@@ -1034,44 +1036,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* Global collapse / expand + export buttons */}
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "8px",
-          marginTop: "10px",
-          alignItems: "center",
-        }}
-      >
-        <button
-          style={{ ...CELL, padding: "8px 12px", width: "auto" }}
-          onClick={collapseAll}
-        >
-          Collapse all
-        </button>
-        <button
-          style={{ ...CELL, padding: "8px 12px", width: "auto" }}
-          onClick={expandAll}
-        >
-          Expand all
-        </button>
-        <button
-          style={{
-            ...CELL,
-            padding: "8px 12px",
-            width: "auto",
-            background: "#f3e8ff",
-            color: "#4c1d95",
-            cursor: "pointer",
-          }}
-          onClick={exportPDF}
-        >
-          Export PDF
-        </button>
-      </div>
-
-      {/* Checklist container (scrollable) */}
+      {/* Checklist container */}
       <div
         style={{
           border: "1px solid #e5e7eb",
@@ -1083,7 +1048,7 @@ export default function App() {
           position: "relative",
         }}
       >
-        {/* Sticky column header */}
+        {/* Sticky column header + collapse/expand row */}
         <div
           style={{
             position: "sticky",
@@ -1093,6 +1058,30 @@ export default function App() {
             borderBottom: "1px solid #e5e7eb",
           }}
         >
+          {/* Collapse/expand row */}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "flex-end",
+              padding: "4px 8px",
+              gap: "8px",
+            }}
+          >
+            <button
+              style={{ ...CELL, padding: "4px 8px", maxWidth: 120 }}
+              onClick={collapseAll}
+            >
+              Collapse all
+            </button>
+            <button
+              style={{ ...CELL, padding: "4px 8px", maxWidth: 120 }}
+              onClick={expandAll}
+            >
+              Expand all
+            </button>
+          </div>
+
+          {/* Column headers */}
           <div style={{ display: "grid", gridTemplateColumns: COLS }}>
             <div style={HDR}>Category</div>
             <div style={HDR}>Item</div>
@@ -1116,7 +1105,7 @@ export default function App() {
                   padding: "8px",
                   borderTop: "1px solid #e5e7eb",
                   position: "sticky",
-                  top: 36,
+                  top: 68,
                   zIndex: 2,
                 }}
               >
@@ -1133,14 +1122,7 @@ export default function App() {
                   {collapsed[section.sec] ? "▶" : "▼"} {section.sec}
                 </button>
 
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "6px",
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                  }}
-                >
+                <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
                   <div style={BADGE}>All {c.total}</div>
                   <div
                     style={{ ...BADGE, background: "#ecfdf5", color: "#065f46" }}
@@ -1152,52 +1134,28 @@ export default function App() {
                   >
                     Fail {c.fail}
                   </div>
-                  <div
-                    style={{ ...BADGE, background: "#e5e7eb", color: "#374151" }}
-                  >
-                    N/A {c.na}
-                  </div>
+                  <div style={{ ...BADGE, background: "#e5e7eb" }}>N/A {c.na}</div>
                   <button
                     onClick={() => setSectionRes(section.sec, "PASS")}
-                    style={{
-                      ...CELL,
-                      padding: "4px 8px",
-                      cursor: "pointer",
-                      width: "auto",
-                    }}
+                    style={{ ...CELL, padding: "4px 8px", cursor: "pointer" }}
                   >
                     All PASS
                   </button>
                   <button
                     onClick={() => setSectionRes(section.sec, "FAIL")}
-                    style={{
-                      ...CELL,
-                      padding: "4px 8px",
-                      cursor: "pointer",
-                      width: "auto",
-                    }}
+                    style={{ ...CELL, padding: "4px 8px", cursor: "pointer" }}
                   >
                     All FAIL
                   </button>
                   <button
                     onClick={() => setSectionRes(section.sec, "N/A")}
-                    style={{
-                      ...CELL,
-                      padding: "4px 8px",
-                      cursor: "pointer",
-                      width: "auto",
-                    }}
+                    style={{ ...CELL, padding: "4px 8px", cursor: "pointer" }}
                   >
                     All N/A
                   </button>
                   <button
                     onClick={() => clearSectionRes(section.sec)}
-                    style={{
-                      ...CELL,
-                      padding: "4px 8px",
-                      cursor: "pointer",
-                      width: "auto",
-                    }}
+                    style={{ ...CELL, padding: "4px 8px", cursor: "pointer" }}
                   >
                     Clear
                   </button>
@@ -1233,12 +1191,7 @@ export default function App() {
                       }
                     />
                     <textarea
-                      style={{
-                        ...CELL,
-                        resize: "vertical",
-                        minHeight: "48px",
-                        lineHeight: 1.35,
-                      }}
+                      style={{ ...CELL, resize: "vertical", minHeight: 48 }}
                       value={r.cp}
                       onChange={(e) =>
                         setAllRows((prev) =>
@@ -1268,8 +1221,9 @@ export default function App() {
                     <textarea
                       style={{
                         ...CELL,
+                        minHeight: 48,
                         resize: "vertical",
-                        minHeight: "40px",
+                        whiteSpace: "pre-wrap",
                       }}
                       value={r.jira || ""}
                       onChange={(e) =>
@@ -1283,8 +1237,9 @@ export default function App() {
                     <textarea
                       style={{
                         ...CELL,
+                        minHeight: 48,
                         resize: "vertical",
-                        minHeight: "40px",
+                        whiteSpace: "pre-wrap",
                       }}
                       value={r.note || ""}
                       onChange={(e) =>
@@ -1343,6 +1298,18 @@ export default function App() {
         </div>
       </div>
 
+      {/* Actions */}
+      <div
+        style={{ display: "flex", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}
+      >
+        <button
+          style={{ ...CELL, padding: "8px 12px", background: "#f3e8ff", color: "#4c1d95", cursor: "pointer" }}
+          onClick={exportPDF}
+        >
+          Export PDF
+        </button>
+      </div>
+
       {/* Photos */}
       <div
         style={{
@@ -1375,10 +1342,7 @@ export default function App() {
               key={p.id}
               style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 8 }}
             >
-              <img
-                src={p.url}
-                style={{ width: "100%", borderRadius: 6, marginBottom: 6 }}
-              />
+              <img src={p.url} style={{ width: "100%", borderRadius: 6 }} />
               <input
                 style={{ ...CELL, marginTop: 6 }}
                 placeholder="Caption"
